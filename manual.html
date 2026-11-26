@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>砖了个砖 · 本地求解器</title>
+<style>
+  :root{
+    --paper:#f6f4ef; --card:#fffdf8; --line:#e2ded2; --ink:#1f2937; --dim:#6b7280;
+    --green:#14532d; --green-soft:#e8f0e9; --amber:#b45309; --red:#b91c1c;
+    --mono:"Cascadia Mono","JetBrains Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;}
+  header{height:56px;background:#fff;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;padding:0 18px;}
+  .brand{font-weight:800;letter-spacing:.02em;color:var(--green);font-size:1.05rem}
+  .brand small{font-weight:500;color:var(--dim);margin-left:8px;letter-spacing:0}
+  .tag{font-family:var(--mono);font-size:12px;color:var(--dim);border:1px solid var(--line);
+    border-radius:999px;padding:4px 10px;background:var(--paper)}
+  main{max-width:1080px;margin:0 auto;padding:22px 18px 60px;
+    display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:22px;align-items:start}
+  @media (max-width:880px){ main{grid-template-columns:1fr} }
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .panel h2{margin:0 0 12px;font-size:.95rem;letter-spacing:.04em;color:var(--green);font-weight:800}
+
+  .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+  .bar label{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:6px}
+  input[type=number]{width:56px;padding:5px 7px;border:1px solid var(--line);border-radius:8px;
+    background:#fff;font-family:var(--mono);font-size:13px;color:var(--ink)}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:9px;
+    padding:7px 13px;font-size:13px;cursor:pointer;transition:.15s}
+  .btn:hover{border-color:#c9c4b6;background:#faf8f2}
+  .btn.primary{background:var(--green);border-color:var(--green);color:#fff;font-weight:700}
+  .btn.primary:hover{background:#0f3f22}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+
+  .palette{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .sw{width:30px;height:30px;border-radius:8px;border:2px solid transparent;cursor:pointer;
+    position:relative}
+  .sw[aria-pressed=true]{border-color:var(--ink);box-shadow:0 0 0 2px #fff inset}
+  .sw.erase{background:#fff;border:1px dashed #b9b4a6;color:var(--dim);font-size:11px;
+    display:flex;align-items:center;justify-content:center}
+
+  #board{display:grid;gap:4px;background:#fff;border:1px solid var(--line);
+    border-radius:12px;padding:8px;touch-action:none;user-select:none}
+  .cell{aspect-ratio:1/1;border-radius:6px;background:#f1efe8;cursor:pointer;
+    transition:transform .08s, box-shadow .08s;position:relative}
+  .cell:hover{transform:scale(1.04)}
+  .cell.hl{box-shadow:0 0 0 3px var(--amber);z-index:2;transform:scale(1.06)}
+  .cell.hl2{box-shadow:0 0 0 3px #2563eb;z-index:2}
+  .cell .n{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:10px;color:rgba(0,0,0,.42)}
+
+  .counts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;font-family:var(--mono);font-size:12px}
+  .chip{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;
+    padding:3px 9px;background:#fff}
+  .chip i{width:12px;height:12px;border-radius:4px;display:block}
+  .chip.odd{border-color:#f0b4b4;color:var(--red);background:#fdf3f3}
+
+  .status{font-size:13px;color:var(--dim);margin:10px 0 0;min-height:20px;line-height:1.6}
+  .status b{color:var(--ink)}
+  .status.err{color:var(--red)}
+
+  #steps{list-style:none;margin:0;padding:0;max-height:430px;overflow:auto;
+    border-top:1px solid var(--line)}
+  #steps li{display:flex;gap:10px;padding:9px 4px;border-bottom:1px solid #f0ede4;
+    font-size:13.5px;line-height:1.45;cursor:pointer}
+  #steps li:hover{background:#faf8f2}
+  #steps li.on{background:var(--green-soft)}
+  #steps .k{font-family:var(--mono);font-size:11px;color:var(--dim);min-width:22px;
+    padding-top:2px;text-align:right}
+  #steps .t{flex:1}
+  #steps .kind{font-size:11px;border-radius:4px;padding:1px 5px;margin-right:6px;
+    font-family:var(--mono)}
+  .kind.elim{background:#fdecec;color:#b91c1c}
+  .kind.slide{background:#e8eefc;color:#1d4ed8}
+
+  .play{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+  .play .pos{font-family:var(--mono);font-size:12px;color:var(--dim);margin-left:auto}
+  .empty{color:var(--dim);font-size:13px;padding:18px 4px}
+  footer{max-width:1080px;margin:0 auto;padding:0 18px 40px;color:var(--dim);font-size:12px;line-height:1.7}
+  code{font-family:var(--mono);background:#efece3;padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">砖了个砖 · 本地求解器<small>引擎取自站内 solver.worker</small></div>
+  <div class="tag" id="engineTag">本地运行 · 不联网</div>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>棋盘</h2>
+    <div class="bar">
+      <label>行 <input type="number" id="rows" min="2" max="20" value="8"></label>
+      <label>列 <input type="number" id="cols" min="2" max="20" value="8"></label>
+      <button class="btn" id="clear">清空</button>
+      <button class="btn" id="sample">随机示例</button>
+      <button class="btn primary" id="solve">求解</button>
+    </div>
+    <div class="palette" id="palette" role="group" aria-label="图案颜色"></div>
+    <div id="board" aria-label="棋盘编辑区"></div>
+    <div class="counts" id="counts"></div>
+    <p class="status" id="status">左键点涂，按住拖动可连涂；右键擦除。</p>
+  </section>
+
+  <section class="panel">
+    <h2>步骤</h2>
+    <div class="play">
+      <button class="btn" id="prev">上一步</button>
+      <button class="btn" id="play">播放</button>
+      <button class="btn" id="next">下一步</button>
+      <span class="pos" id="pos">—</span>
+    </div>
+    <ul id="steps"><li class="empty">还没有求解结果。</li></ul>
+  </section>
+</main>
+
+<footer>
+  求解在你的电脑上完成，不上传棋盘、不消耗任何积分。引擎文件为
+  <code>engine/solver.worker.js</code>，来自 zhuan.zoro.build 的公开前端资源。
+</footer>
+
+<script id="solver-src" type="text/plain">function e(e,t,n,r){let i=new Uint8Array(e*t);n&&i.set(n);let a=new Uint8Array(e*t);return r&&a.set(r),{rows:e,cols:t,cells:i,flags:a}}function t(e){return{rows:e.rows,cols:e.cols,cells:e.cells.slice(),flags:e.flags.slice()}}function n(e){let t=0;for(let n of e.cells)n>t&&(t=n);return t}function r(e,t=n(e)){let r=new Uint32Array(t+1);for(let t of e.cells)r[t]++;return r}function i(e){let t=0;for(let n of e.cells)n!==0&&t++;return t}Object.fromEntries([...`.*~#?!%&$abcdefg@hijklmnopqrstuv`].map((e,t)=>[e,t]));const a={L:{dr:0,dc:-1},R:{dr:0,dc:1},U:{dr:-1,dc:0},D:{dr:1,dc:0}},o={L:[`U`,`D`],R:[`U`,`D`],U:[`L`,`R`],D:[`L`,`R`]};function s(e,t,n,r){let{rows:i,cols:o,cells:s}=e,{dr:c,dc:l}=a[r],u=t+c,d=n+l;for(;u>=0&&u<i&&d>=0&&d<o;){let e=u*o+d;if(s[e]!==0)return e;u+=c,d+=l}return-1}function c(e,t,n){let{cols:r,cells:i,flags:a}=e;if(t===n)return!1;let o=i[t];if(o===0||i[n]!==o||(a[t]|a[n])&4)return!1;let s=Math.floor(t/r),c=t%r,l=Math.floor(n/r),u=n%r;if(s!==l&&c!==u)return!1;let d=s===l?u>c?1:-1:l>s?r:-r;for(let e=t+d;e!==n;e+=d)if(i[e]!==0)return!1;return!0}function l(e){let{rows:t,cols:n,cells:r,flags:i}=e,a=[];for(let e=0;e<t;e++){let t=-1;for(let o=0;o<n;o++){let s=e*n+o;r[s]!==0&&(t!==-1&&r[t]===r[s]&&!((i[t]|i[s])&4)&&a.push({kind:`elim`,a:t,b:s}),t=s)}}for(let e=0;e<n;e++){let o=-1;for(let s=0;s<t;s++){let t=s*n+e;r[t]!==0&&(o!==-1&&r[o]===r[t]&&!((i[o]|i[t])&4)&&a.push({kind:`elim`,a:o,b:t}),o=t)}}return a}function u(e){let{rows:t,cols:n,cells:r,flags:i}=e,c=[];for(let l=0;l<t;l++)for(let u=0;u<n;u++){let d=l*n+u,f=r[d];if(f!==0&&!(i[d]&5))for(let p of[`L`,`R`,`U`,`D`]){let{dr:m,dc:h}=a[p],g=l,_=u,v=!1;for(;;){let e=g+m,a=_+h;if(e<0||e>=t||a<0||a>=n)break;let o=e*n+a;if(r[o]===0)break;if(i[o]&1){v=!0;break}g=e,_=a}if(v)continue;let y=g+m,b=_+h,x=0;for(;y>=0&&y<t&&b>=0&&b<n&&r[y*n+b]===0;)x++,y+=m,b+=h;if(x!==0)for(let t=1;t<=x;t++){let a=l+t*m,g=u+t*h,_=a*n+g;for(let n of o[p]){let o=s(e,a,g,n);o!==-1&&r[o]===f&&!(i[o]&4)&&c.push({kind:`slide`,from:d,dir:p,dist:t,to:_,partner:o})}}}}return c}function d(e,t){let{rows:n,cols:r,cells:i}=e,a=Math.floor(t/r),o=t%r;return a>0&&i[t-r]!==0||a<n-1&&i[t+r]!==0||o>0&&i[t-1]!==0||o<r-1&&i[t+1]!==0}function f(e,t,n,r,i=5){if(r&&d(e,n))return;let a=e.flags[n];t.some(e=>e.idx===n)||t.push({idx:n,prev:e.cells[n],prevFlag:a}),e.flags[n]=a&~i}function p(e,t,n,r){let{rows:i,cols:a,flags:o}=e,s=Math.floor(n/a),c=n%a,l=s>0,u=s<i-1,d=c>0,p=c<a-1;l&&o[n-a]&5&&f(e,t,n-a,r),u&&o[n+a]&5&&f(e,t,n+a,r),d&&o[n-1]&5&&f(e,t,n-1,r),p&&o[n+1]&5&&f(e,t,n+1,r),!r&&(l&&d&&o[n-a-1]&4&&f(e,t,n-a-1,!1,4),l&&p&&o[n-a+1]&4&&f(e,t,n-a+1,!1,4),u&&d&&o[n+a-1]&4&&f(e,t,n+a-1,!1,4),u&&p&&o[n+a+1]&4&&f(e,t,n+a+1,!1,4))}function m(e,t,n,r){let i=t.length;p(e,t,n,!1),p(e,t,r,!1);for(let a=0;a<i;a++){let{idx:i,prev:o}=t[a];i!==n&&i!==r&&o!==0&&e.cells[i]===0&&p(e,t,i,!0)}}function h(e){let{cells:t,flags:n}=e;for(let r=0;r<t.length;r++)t[r]===0?n[r]=0:n[r]&5&&!d(e,r)&&(n[r]&=-6)}function g(e){let t=-1,n=-1;for(let r=0;r<e.cells.length;r++)if(!(e.cells[r]===0||!((e.flags[r]??0)&2)))if(t<0)t=r;else if(n<0)n=r;else return null;return n>=0&&e.cells[t]!==e.cells[n]?[t,n]:null}function _(e,t){let{cells:n,flags:r}=e,i=0;for(let e=0;e<n.length;e++)n[e]===0&&i++;if(Math.floor(i/2)%3!=0)return;let a=g(e);if(!a)return;for(let e of a)t.some(t=>t.idx===e)||t.push({idx:e,prev:n[e],prevFlag:r[e]});let[o,s]=a,c=n[o];n[o]=n[s],n[s]=c}function v(e,t,n=!0,r=!0){let{cells:i,flags:o}=e;if(t.kind===`elim`){let a=[{idx:t.a,prev:i[t.a],prevFlag:o[t.a]},{idx:t.b,prev:i[t.b],prevFlag:o[t.b]}];return i[t.a]=0,i[t.b]=0,o[t.a]=0,o[t.b]=0,n&&m(e,a,t.a,t.b),r&&_(e,a),a}let{rows:s,cols:c}=e,{dr:l,dc:u}=a[t.dir],d=l*c+u,f=t.dist,p=1;{let e=Math.floor(t.from/c),n=t.from%c;for(;;){let t=e+l,r=n+u;if(t<0||t>=s||r<0||r>=c||i[t*c+r]===0)break;e=t,n=r,p++}}let h=new Set;for(let e=0;e<p;e++)h.add(t.from+e*d),h.add(t.from+(e+f)*d);h.add(t.partner);let g=[];for(let e of h)g.push({idx:e,prev:i[e],prevFlag:o[e]});for(let e=p-1;e>=0;e--){let n=t.from+e*d,r=t.from+(e+f)*d;i[r]=i[n],o[r]=o[n]}for(let e=0;e<f;e++)i[t.from+e*d]=0,o[t.from+e*d]=0;return i[t.to]=0,i[t.partner]=0,o[t.to]=0,o[t.partner]=0,n&&m(e,g,t.to,t.partner),r&&_(e,g),g}function y(e,t){for(let n=t.length-1;n>=0;n--)e.cells[t[n].idx]=t[n].prev,e.flags[t[n].idx]=t[n].prevFlag}function b(e,t){if(t.kind===`elim`)return{kind:`elim`,a:t.a,b:t.b};let{rows:n,cols:r,cells:i}=e,{dr:o,dc:s}=a[t.dir],c=o*r+s,l=[],u=Math.floor(t.from/r),d=t.from%r,f=1;for(;;){let e=u+o,a=d+s;if(e<0||e>=n||a<0||a>=r||i[e*r+a]===0)break;l.push({from:t.from+f*c,to:t.from+(f+t.dist)*c}),u=e,d=a,f++}return{kind:`slide`,from:t.from,dir:t.dir,dist:t.dist,to:t.to,partner:t.partner,pushed:l}}function x(e,n,r=0){let i=t(e);h(i);for(let e=0;e<n.length;e++){let t=n[e],r=`第 ${e+1} 步`;if(t.kind===`elim`){let e=i.cells[t.a];if(e===0||i.cells[t.b]!==e)return{ok:!1,error:`${r}: 消除的两格类型不同或为空`};if(!c(i,t.a,t.b))return{ok:!1,error:`${r}: 两格不同行不同列，或中间有砖块阻挡`};v(i,{kind:`elim`,a:t.a,b:t.b})}else{let e=u(i).find(e=>e.from===t.from&&e.dir===t.dir&&e.dist===t.dist&&e.partner===t.partner);if(!e)return{ok:!1,error:`${r}: 滑动走法不合法`};if(e.to!==t.to)return{ok:!1,error:`${r}: 滑动终点不一致`};let n=b(i,e);if(n.kind===`slide`&&JSON.stringify(n.pushed)!==JSON.stringify(t.pushed))return{ok:!1,error:`${r}: 推动信息不一致`};v(i,e)}}let a=i.cells.reduce((e,t)=>e+(t===0?0:1),0);return a===r?{ok:!0}:{ok:!1,error:r===0?`步骤执行完后棋盘未清空`:`步骤执行完后剩 ${a} 块，应剩 ${r} 块`}}let S=!1;function C(e,n,r=n.length,i){let a=t(e);h(a);for(let e=0;e<r&&e<n.length;e++){let t=n[e];i?.(a,t,e);let r=w(a,t);r?v(a,r):S||(S=!0,console.warn(`回放第 ${e+1} 步：滑动走法与盘面对不上，已跳过`))}return a}function w(e,t){return t.kind===`elim`?{kind:`elim`,a:t.a,b:t.b}:u(e).find(e=>e.from===t.from&&e.dir===t.dir&&e.dist===t.dist&&e.partner===t.partner)??null}function T(e,t){let n=(e,t)=>Array.from({length:e},(e,n)=>t(n)),r=[{side:`top`,cells:n(t,e=>e)}];return e>1&&r.push({side:`bottom`,cells:n(t,n=>(e-1)*t+n)}),r.push({side:`left`,cells:n(e,e=>e*t)}),t>1&&r.push({side:`right`,cells:n(e,e=>e*t+t-1)}),r}var E=class{lines;first;lo;hi;dead;spans=0;constructor(e,t,n){this.lines=T(e,t).map(({side:e,cells:t})=>({side:e,cells:Int32Array.from(t)})),this.first=new Int16Array(n).fill(-1);let r=Math.ceil(Math.max(e,t)/2);this.lo=new Int16Array(r),this.hi=new Int16Array(r),this.dead=new Uint8Array(r)}count(e,t){let n=0;for(let{cells:r}of this.lines)n+=this.scan(r,e,t);return n*2}find(e,t){let n=[];for(let{side:r,cells:i}of this.lines){if(this.scan(i,e,t)===0)continue;let a=[];for(let e=0;e<this.spans;e++)this.dead[e]&&a.push(this.lo[e],this.hi[e]);a.sort((e,t)=>e-t),n.push({side:r,cells:a.map(e=>i[e])})}return n.length===0?null:{edges:n,stuck:n.flatMap(e=>e.cells).sort((e,t)=>e-t)}}scan(e,t,n){let{first:r,lo:i,hi:a,dead:o}=this,s=0;for(let c=0;c<e.length;c++){let l=t[e[c]];if(l===0||n[l]!==2)continue;let u=r[l];u<0?r[l]=c:(i[s]=u,a[s]=c,o[s]=0,s++)}for(let n=0;n<e.length;n++){let i=t[e[n]];i!==0&&(r[i]=-1)}if(this.spans=s,s<2)return 0;let c=!1;for(let e=0;e<s;e++)for(let t=0;t<s;t++)i[e]<i[t]&&i[t]<a[e]&&a[e]<a[t]&&(o[e]=1,o[t]=1,c=!0);if(!c)return 0;let l=!0;for(;l;){l=!1;for(let e=0;e<s;e++)if(!o[e]){for(let t=0;t<s;t++)if(o[t]&&(i[e]<i[t]&&i[t]<a[e]||i[e]<a[t]&&a[t]<a[e])){o[e]=1,l=!0;break}}}let u=0;for(let e=0;e<s;e++)u+=o[e];return u}};function ee(e){let t=r(e);return new E(e.rows,e.cols,t.length).find(e.cells,t)}function D(e){let t=e>>>0;return t===0&&(t=2654435769),()=>(t^=t<<13,t>>>=0,t^=t>>>17,t^=t<<5,t>>>=0,t)}function O(e){return e()/4294967296}var k=class{t1;t2;f1;f2;u1;u2;v1;v2;typeCount;constructor(e,t,n=305419896){this.typeCount=t;let r=e*t;this.t1=new Uint32Array(r),this.t2=new Uint32Array(r);let i=D(n);for(let e=0;e<r;e++)this.t1[e]=i(),this.t2[e]=i();this.f1=new Uint32Array(e),this.f2=new Uint32Array(e);for(let t=0;t<e;t++)this.f1[t]=i(),this.f2[t]=i();this.u1=new Uint32Array(e),this.u2=new Uint32Array(e);for(let t=0;t<e;t++)this.u1[t]=i(),this.u2[t]=i();this.v1=new Uint32Array(e),this.v2=new Uint32Array(e);for(let t=0;t<e;t++)this.v1[t]=i(),this.v2[t]=i()}key(e,t){return e*this.typeCount+t}};function A(e,t){return(t.kind===`elim`?[t.a,t.b]:[t.from,t.partner]).some(t=>!!((e.flags[t]??0)&8))}function j(e,t){let n=!1;return C(e,t,t.length,(e,t)=>{if(!(n||!A(e,t))){for(let t=0;t<e.cells.length;t++)if(e.cells[t]!==0&&!(e.flags[t]&8)){n=!0;return}}}),n}function M(e,t){return!!((e.flags[t]??0)&16)}function N(e,t){return t.kind===`elim`?M(e,t.a)||M(e,t.b):M(e,t.from)||M(e,t.partner)}function P(e,t){return N(e,t)?t.kind===`elim`?t.b:t.partner:null}function F(e,t,n){let r=Math.floor(n/t),i=n%t,a=[];for(let n=Math.max(0,r-2);n<=Math.min(e-1,r+2);n++)for(let e=Math.max(0,i-2);e<=Math.min(t-1,i+2);e++)a.push(n*t+e);return a}function I(e,t){return t.some(t=>e.cells[t]!==0)}function L(e,t,n){let r=0;for(let i of F(e.rows,e.cols,t))e.cells[i]!==0&&!n.includes(i)&&r++;return r}function R(e,t,n){return L(e,t,[t,n])<L(e,n,[t,n])?[n,t]:[t,n]}function z(e,n){let r=P(e,n);if(r===null)return null;let i=t(e),a=w(i,n);if(!a)return null;v(i,a);let o=F(e.rows,e.cols,r);return{center:r,area:o,shuffles:I(i,o)}}function B(e,t){let n=!1;return C(e,t,t.length,(e,t)=>{!n&&z(e,t)?.shuffles&&(n=!0)}),n}function V(e,t){return e.cells[t]!==0&&!!((e.flags[t]??0)&2)}function H(e){let t=0;for(let n=0;n<e.cells.length;n++)if(V(e,n)){if(t===0)t=e.cells[n];else if(e.cells[n]!==t)return!0}return!1}function U(e,t,n){let{rows:r,cols:i,cells:o}=e,{dr:s,dc:c}=a[n],l=Math.floor(t/i)+s,u=t%i+c;for(;l>=0&&l<r&&u>=0&&u<i&&o[l*i+u]!==0;)l+=s,u+=c;let d=0;for(;l>=0&&l<r&&u>=0&&u<i&&o[l*i+u]===0;)d++,l+=s,u+=c;return d}function W(e,t){return e<=3?[0,e,+!t]:[1,+!t,e]}function G(e,t){return W(t.dist,t.dist===U(e,t.from,t.dir))}function K(e,t){for(let n=0;n<e.length;n++)if(e[n]!==t[n])return e[n]<t[n];return!1}function te(e,t){for(let n=0;n<e.cells.length;n++)if(e.cells[n]!==t.cells[n]||e.flags[n]!==t.flags[n])return!1;return!0}function ne(e,n){let r=t(e);h(r);let i=n.slice();for(let e=0;e<n.length;e++){let t=n[e],a=w(r,t);if(!a)break;a.kind===`slide`&&t.kind===`slide`&&(i[e]=re(r,t,a)),v(r,a)}return i}function re(e,n,r){let i=r,a=G(e,r),o=null,s=N(e,n)?z(e,n):null;for(let n of u(e)){if(!(n.from===r.from&&n.partner===r.partner||n.from===r.partner&&n.partner===r.from))continue;let c=G(e,n);if(!K(c,a)||s&&(s.shuffles?n.partner!==r.partner:z(e,b(e,n))?.shuffles))continue;o||(o=t(e),v(o,r));let l=t(e);v(l,n),te(l,o)&&(i=n,a=c)}return i===r?n:b(e,i)}const q=1e7,J=Symbol(`timeUp`),Y=Symbol(`restart`),X=Symbol(`stopped`);var ie=class e{board;initialBoard;K;zob;opts;counts;initialCounts;h1=0;h2=0;initialH1=0;initialH2=0;deadMap=new Map;deadCount=0;phase;epochIndex=0;rng=D(1);stepStack=[];solvedSteps=null;bestSteps=[];bestRemaining;initRemaining;hasLocked;variableLeft=0;initialVariableLeft;cellCount;nodes=0;accumulatedMs=0;deadline=0;runStart=0;epochStart=0;lastProgressAt=0;finished=null;reason;deadlock;target;stuckTypes;stuckCounter;pruneStuck;constructor(e,a={}){this.board=t(e),h(this.board),this.initialBoard=t(this.board),this.K=n(this.board)+1,this.zob=new k(this.board.cells.length,this.K,(a.seed??24301)^2654435769),this.opts={useForcedMoves:!0,restartIntervalMs:150,progressIntervalMs:250,maxDeadEntries:2e6,pruneStuck:!0,preferVariable:!0,luckyLast:!0,resetLast:!0,polishSlides:!0,...a},this.phase=this.opts.useForcedMoves?`forced`:`full`,this.counts=r(this.board,this.K-1),this.initialCounts=this.counts.slice(),this.initRemaining=i(this.board),this.hasLocked=this.board.flags.some(e=>!!(e&5)),this.initialVariableLeft=this.board.flags.reduce((e,t)=>e+(t&2?1:0),0),this.variableLeft=this.initialVariableLeft,this.cellCount=this.board.cells.length,this.bestRemaining=this.initRemaining;let[o,s]=this.hashFromScratch();this.h1=o,this.h2=s,this.initialH1=o,this.initialH2=s;for(let e=1;e<this.K;e++)if(this.counts[e]%2==1){this.reason=`存在数量为单数的图案，该棋盘不可能清空（识别结果可能有误）`;break}let c=this.reason?null:ee(this.board),l=H(this.board);this.deadlock=c&&!(l&&c.stuck.some(e=>this.board.flags[e]&2))?c:void 0,this.pruneStuck=this.opts.pruneStuck&&!l,this.target=this.deadlock?.stuck.length??0,this.stuckTypes=[...new Set((this.deadlock?.stuck??[]).map(e=>this.board.cells[e]))],this.stuckCounter=new E(this.board.rows,this.board.cols,this.K)}run(e){if(this.finished)return this.finished;if(this.reason)return this.finished=this.buildResult(!1,!0),this.finished;if(this.initRemaining===0)return this.solvedSteps=[],this.finished=this.buildResult(!0,!1),this.finished;this.runStart=Date.now(),this.deadline=this.runStart+e,this.lastProgressAt=this.runStart;let t=null;for(;t===null;){if(Date.now()>=this.deadline){t=`timeout`;break}let e=(this.opts.seed??24301)+this.epochIndex*2654435761>>>0;this.rng=D(e),this.epochStart=Date.now();try{this.dfs(this.initRemaining)?t=`solved`:this.phase===`forced`?(this.phase=`full`,this.deadMap=new Map,this.deadCount=0,this.restoreSnapshot()):t=`exhausted`}catch(e){if(this.restoreSnapshot(),e===Y){this.epochIndex++;continue}if(e===J)t=`timeout`;else if(e===X)t=`stopped`;else throw e}}if(this.accumulatedMs+=Date.now()-this.runStart,t===`solved`){if(this.restoreSnapshot(),!this.solvedSteps){this.bestSteps=this.polish(this.bestSteps);let e=x(this.initialBoard,this.bestSteps,this.target);if(!e.ok)throw Error(`求解器输出了非法步骤（内部错误）: ${e.error}`);return this.finished=this.buildResult(!1,!0),this.finished}this.solvedSteps=this.polish(this.solvedSteps);let e=x(this.initialBoard,this.solvedSteps);if(!e.ok)throw Error(`求解器输出了非法步骤（内部错误）: ${e.error}`);return this.keepLast(),this.finished=this.buildResult(!0,!1),this.finished}return t===`exhausted`?(this.finished=this.buildResult(!1,!0),this.finished):this.buildResult(!1,!1)}keepLast(){if(this.opts.strictLast||!this.solvedSteps)return;let t=this.initialBoard,n=this.solvedSteps,r=e=>t.flags.some(t=>(t&e)!==0);if(!(this.opts.luckyLast&&r(8)&&j(t,n)||this.opts.resetLast&&r(16)&&B(t,n)))return;let i=Math.min(3e3,this.deadline-Date.now());if(i<=0)return;let a=this.nodes,o=this.accumulatedMs,s=Date.now(),c=this.opts.onProgress,l=new e(this.initialBoard,{...this.opts,strictLast:!0,onProgress:c&&(e=>c({nodes:a+e.nodes,elapsedMs:o+(Date.now()-s),bestRemaining:0}))}).run(i);this.nodes+=l.nodes,this.accumulatedMs+=Date.now()-s,l.solved&&(this.solvedSteps=l.steps)}polish(e){return this.opts.polishSlides?ne(this.initialBoard,e):e}buildResult(e,t){return{solved:e,exhausted:t,steps:e?this.solvedSteps:[],bestSteps:this.polish(this.bestSteps),bestRemaining:this.bestRemaining,nodes:this.nodes,elapsedMs:this.accumulatedMs,reason:this.reason,deadlock:this.deadlock}}restoreSnapshot(){this.board.cells.set(this.initialBoard.cells),this.board.flags.set(this.initialBoard.flags),this.counts.set(this.initialCounts),this.variableLeft=this.initialVariableLeft,this.h1=this.initialH1,this.h2=this.initialH2,this.stepStack.length=0}checkTime(){let e=Date.now();if(this.opts.shouldStop?.())throw X;if(e>=this.deadline)throw J;if(e-this.lastProgressAt>=this.opts.progressIntervalMs&&(this.lastProgressAt=e,this.opts.onProgress?.({nodes:this.nodes,elapsedMs:this.accumulatedMs+(e-this.runStart),bestRemaining:this.bestRemaining})),e-this.epochStart>=this.opts.restartIntervalMs)throw Y}hashFromScratch(){let{cells:e,flags:t}=this.board,n=0,r=0;for(let i=0;i<e.length;i++){let a=e[i];a!==0&&(n^=this.zob.t1[this.zob.key(i,a)],r^=this.zob.t2[this.zob.key(i,a)],t[i]&1&&(n^=this.zob.f1[i],r^=this.zob.f2[i]),t[i]&4&&(n^=this.zob.u1[i],r^=this.zob.u2[i]),t[i]&2&&(n^=this.zob.v1[i],r^=this.zob.v2[i]))}return[n,r]}debugHash(){return{incremental:[this.h1,this.h2],scratch:this.hashFromScratch()}}applyDelta(e,t){let{cells:n,flags:r}=this.board;for(let{idx:i,prev:a,prevFlag:o}of e){let e=n[i];a!==0&&(this.h1^=this.zob.t1[this.zob.key(i,a)],this.h2^=this.zob.t2[this.zob.key(i,a)],this.counts[a]-=t),e!==0&&(this.h1^=this.zob.t1[this.zob.key(i,e)],this.h2^=this.zob.t2[this.zob.key(i,e)],this.counts[e]+=t),(o^r[i])&1&&(this.h1^=this.zob.f1[i],this.h2^=this.zob.f2[i]),(o^r[i])&4&&(this.h1^=this.zob.u1[i],this.h2^=this.zob.u2[i]),(o^r[i])&2&&(this.h1^=this.zob.v1[i],this.h2^=this.zob.v2[i],this.variableLeft+=r[i]&2?t:-t)}}findForcedMove(){let{cells:e,flags:t}=this.board;for(let n=1;n<this.K;n++){if(this.counts[n]!==2)continue;let r=-1,i=-1;for(let t=0;t<e.length;t++)if(e[t]===n)if(r===-1)r=t;else{i=t;break}if(!(this.opts.luckyLast&&(t[r]|t[i])&8)&&c(this.board,r,i)){if(this.opts.resetLast&&(t[r]|t[i])&16){let e=this.resetElim({kind:`elim`,a:r,b:i});if(e.shuffles)continue;return e.m}return{kind:`elim`,a:r,b:i}}}return null}sameTypeNeighbors(e,t,n){let{rows:r,cols:i,cells:a}=this.board,o=Math.floor(e/i),s=e%i,c=0;return o>0&&e-i!==n&&a[e-i]===t&&c++,o<r-1&&e+i!==n&&a[e+i]===t&&c++,s>0&&e-1!==n&&a[e-1]===t&&c++,s<i-1&&e+1!==n&&a[e+1]===t&&c++,c}lockedNeighbors(e,t){let{rows:n,cols:r,flags:i}=this.board,a=Math.floor(e/r),o=e%r,s=a>0,c=a<n-1,l=o>0,u=o<r-1,d=0;return s&&e-r!==t&&i[e-r]&5&&d++,c&&e+r!==t&&i[e+r]&5&&d++,l&&e-1!==t&&i[e-1]&5&&d++,u&&e+1!==t&&i[e+1]&5&&d++,s&&l&&i[e-r-1]&4&&d++,s&&u&&i[e-r+1]&4&&d++,c&&l&&i[e+r-1]&4&&d++,c&&u&&i[e+r+1]&4&&d++,d}eliminatesVariable(e){let{flags:t}=this.board;return e.kind===`elim`?!!((t[e.a]|t[e.b])&2):!!((t[e.from]|t[e.partner])&2)}eliminatesLucky(e){let{flags:t}=this.board;return e.kind===`elim`?!!((t[e.a]|t[e.b])&8):!!((t[e.from]|t[e.partner])&8)}eliminatesReset(e){let{flags:t}=this.board;return e.kind===`elim`?!!((t[e.a]|t[e.b])&16):!!((t[e.from]|t[e.partner])&16)}resetElim(e){let[t,n]=R(this.board,e.a,e.b);return{m:{kind:`elim`,a:t,b:n},shuffles:L(this.board,n,[t,n])>0}}resetSlideShuffles(e){let t=this.board,n=v(t,e,!1,!1),r=I(t,F(t.rows,t.cols,e.partner));return y(t,n),r}orderedMoves(){let e=this.opts.preferVariable&&this.variableLeft>0,t=this.phase===`forced`?this.findForcedMove():null;if(t&&!e)return[t];let n=l(this.board),r=u(this.board),i=90*(1+this.epochIndex*.15),a=new Map,{cells:o,flags:s}=this.board,c=0,d=0,f=0,p=0;for(let e=0;e<o.length;e++){let t=o[e];if(t===0)continue;c|=s[e]&5,d|=s[e]&8,f|=s[e]&16,s[e]&8||p++;let n=a.get(t);n||(n=[],a.set(t,n)),n.push(e)}let m=this.board.cols,h=[],g=0,_=this.opts.luckyLast&&d!==0,v=this.opts.resetLast&&f!==0,y=(e,t)=>t||_&&this.eliminatesLucky(e),b=(t,n)=>!e||!this.eliminatesVariable(t)||n?0:(g++,1e6),x=this.opts.strictLast===!0,S=_&&x&&p>0,C=(e,t)=>S&&this.eliminatesLucky(e)||x&&t;for(let e of n){let{m:t,shuffles:n}=v&&this.eliminatesReset(e)?this.resetElim(e):{m:e,shuffles:!1};if(C(t,n))continue;let r=y(t,n),o=this.board.cells[t.a],s=this.sameTypeNeighbors(t.a,o,t.b)+this.sameTypeNeighbors(t.b,o,t.a),l=0;if(this.counts[o]===4){let e=a.get(o).filter(e=>e!==t.a&&e!==t.b);if(e.length===2){let[t,n]=e,r=Math.abs(Math.floor(t/m)-Math.floor(n/m)),i=Math.abs(t%m-n%m);l=r===0||i===0?(r+i)*8:600+(r+i)*25}}let u=c?(this.lockedNeighbors(t.a,t.b)+this.lockedNeighbors(t.b,t.a))*250:0;h.push({m:t,s:this.counts[o]*100+s*700+l-u-b(t,r)+(r?q:0)+O(this.rng)*i})}for(let e of r){let t=v&&this.eliminatesReset(e)&&this.resetSlideShuffles(e);if(C(e,t))continue;let n=y(e,t),r=this.board.cells[e.from],a=c?(this.lockedNeighbors(e.to,e.partner)+this.lockedNeighbors(e.partner,e.to))*250:0;h.push({m:e,s:1e5+this.counts[r]*100+e.dist*10-a-b(e,n)+(n?q:0)+O(this.rng)*i})}h.sort((e,t)=>e.s-t.s);let w=h.map(e=>e.m);if(!t)return w;let T=w.slice(0,g);return T.some(e=>e.kind===`elim`&&e.a===t.a&&e.b===t.b)?T:[...T,t]}atFloor(){for(let e of this.stuckTypes)if(this.counts[e]!==2)return!1;return l(this.board).length===0&&u(this.board).length===0}isDead(){return this.deadMap.get(this.h1)?.has(this.h2)??!1}markDead(){if(this.deadCount>=this.opts.maxDeadEntries)return;let e=this.deadMap.get(this.h1);e||(e=new Set,this.deadMap.set(this.h1,e)),e.has(this.h2)||(e.add(this.h2),this.deadCount++)}dfs(e){if(this.nodes++,this.nodes&1023||this.checkTime(),e===0)return this.solvedSteps=this.stepStack.slice(),!0;if(e<this.bestRemaining&&(this.bestRemaining=e,this.bestSteps=this.stepStack.slice()),e===this.target&&this.atFloor())return this.bestSteps=this.stepStack.slice(),!0;if(this.isDead()||this.phase===`forced`&&this.pruneStuck&&this.stuckCounter.count(this.board.cells,this.counts)>this.target)return!1;let t=this.orderedMoves(),n=this.variableLeft>=2&&Math.floor((this.cellCount-e+2)/2)%3==0;for(let r of t){let t=b(this.board,r),i=v(this.board,r,this.hasLocked,n);if(this.applyDelta(i,1),this.stepStack.push(t),this.dfs(e-2))return!0;this.stepStack.pop(),this.applyDelta(i,-1),y(this.board,i)}return this.markDead(),!1}};const Z=self;function Q(e){Z.postMessage(e)}let $=null;Z.onmessage=t=>{let n=t.data;try{if(n.type===`solve`)$=new ie(e(n.rows,n.cols,n.cells,n.flags),{seed:n.seed,onProgress:e=>Q({type:`progress`,progress:e})}),Q({type:`result`,result:$.run(n.budgetMs)});else if(n.type===`continue`){if(!$){Q({type:`error`,message:`没有可继续的求解任务`});return}Q({type:`result`,result:$.run(n.extraMs)})}}catch(e){Q({type:`error`,message:e instanceof Error?e.message:String(e)})}};</script>
+<script>
+(function(){
+  const COLORS = ['#e0a49b','#87bfa2','#a3b8e6','#e6d094','#c3a3d8','#9fd4d4','#e8b98a','#b9b3a6'];
+  const $ = (s) => document.querySelector(s);
+  const boardEl = $('#board'), stepsEl = $('#steps'), statusEl = $('#status'), countsEl = $('#counts');
+
+  let rows = 8, cols = 8;
+  let cells = new Array(rows * cols).fill(0);
+  let cur = 1;
+  let painting = false;
+  let result = null;
+  let active = -1;
+  let timer = null;
+
+  /* ---------- 调色板 ---------- */
+  function buildPalette(){
+    const p = $('#palette');
+    p.innerHTML = '';
+    for (let i = 0; i < COLORS.length; i++){
+      const b = document.createElement('button');
+      b.className = 'sw';
+      b.style.background = COLORS[i];
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(cur === i + 1));
+      b.title = '图案 ' + (i + 1);
+      b.onclick = () => { cur = i + 1; buildPalette(); };
+      p.appendChild(b);
+    }
+    const e = document.createElement('button');
+    e.className = 'sw erase'; e.type = 'button'; e.textContent = '擦';
+    e.title = '擦除（也可以右键）';
+    e.onclick = () => { cur = 0; buildPalette(); };
+    p.appendChild(e);
+  }
+
+  /* ---------- 棋盘 ---------- */
+  function buildBoard(){
+    boardEl.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0,1fr))';
+    boardEl.innerHTML = '';
+    for (let i = 0; i < rows * cols; i++){
+      const d = document.createElement('div');
+      d.className = 'cell';
+      d.dataset.i = i;
+      d.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        painting = true;
+        paint(i, ev.button === 2);
+        d.setPointerCapture?.(ev.pointerId);
+      });
+      d.addEventListener('pointerenter', () => { if (painting) paint(i, false); });
+      d.addEventListener('contextmenu', (ev) => { ev.preventDefault(); paint(i, true); });
+      boardEl.appendChild(d);
+    }
+    boardEl.addEventListener('pointerup', () => { painting = false; });
+    boardEl.addEventListener('pointerleave', () => { painting = false; });
+    render();
+  }
+
+  function paint(i, erase){
+    const v = erase ? 0 : cur;
+    if (cells[i] === v) return;
+    cells[i] = v;
+    paintCell(i);
+    renderCounts();
+  }
+
+  function paintCell(i){
+    const el = boardEl.children[i];
+    if (!el) return;
+    const v = cells[i];
+    el.style.background = v ? COLORS[(v - 1) % COLORS.length] : '#f1efe8';
+    el.classList.toggle('hl', false);
+    el.classList.toggle('hl2', false);
+  }
+
+  function render(){
+    for (let i = 0; i < cells.length; i++) paintCell(i);
+    renderCounts();
+  }
+
+  function renderCounts(){
+    const c = new Array(COLORS.length + 1).fill(0);
+    for (const v of cells) if (v) c[v]++;
+    countsEl.innerHTML = '';
+    let any = false;
+    for (let k = 1; k <= COLORS.length; k++){
+      if (!c[k]) continue;
+      any = true;
+      const chip = document.createElement('span');
+      chip.className = 'chip' + (c[k] % 2 ? ' odd' : '');
+      chip.innerHTML = '<i style="background:' + COLORS[k - 1] + '"></i>' + k + ' × ' + c[k];
+      countsEl.appendChild(chip);
+    }
+    if (!any){
+      countsEl.innerHTML = '<span class="chip">棋盘还是空的</span>';
+    } else if (countsEl.querySelector('.odd')){
+      countsEl.insertAdjacentHTML('beforeend', '<span class="chip odd">有图案数量为奇数，这盘不可能清空</span>');
+    }
+  }
+
+  /* ---------- 求解 ---------- */
+  const src = document.getElementById('solver-src').textContent;
+  let workerUrl = null;
+
+  function ensureWorkerUrl(){
+    if (!workerUrl){
+      workerUrl = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+    }
+    return workerUrl;
+  }
+
+  function solve(){
+    stopPlay();
+    const filled = cells.filter(Boolean).length;
+    if (!filled){
+      setStatus('棋盘是空的，先涂几个图案。', true);
+      return;
+    }
+    const btn = $('#solve');
+    btn.disabled = true;
+    btn.textContent = '求解中…';
+    setStatus('正在搜索…');
+
+    const w = new Worker(ensureWorkerUrl(), { type: 'module' });
+    const t0 = Date.now();
+    w.onmessage = (ev) => {
+      const m = ev.data;
+      if (m.type === 'progress'){
+        const p = typeof m.progress === 'number' ? Math.round(m.progress * 100) + '%' : '';
+        setStatus('正在搜索… ' + p);
+      } else if (m.type === 'result'){
+        w.terminate();
+        btn.disabled = false;
+        btn.textContent = '求解';
+        showResult(m.result, Date.now() - t0);
+      } else if (m.type === 'error'){
+        w.terminate();
+        btn.disabled = false;
+        btn.textContent = '求解';
+        setStatus('求解器报错：' + m.message, true);
+      }
+    };
+    w.onerror = (e) => {
+      w.terminate();
+      btn.disabled = false;
+      btn.textContent = '求解';
+      setStatus('求解器异常：' + (e.message || '未知错误'), true);
+    };
+    w.postMessage({
+      type: 'solve',
+      rows, cols,
+      cells: Uint8Array.from(cells),
+      flags: new Uint8Array(rows * cols),
+      budgetMs: 8000,
+    });
+  }
+
+  function pos(i){ return '第' + (Math.floor(i / cols) + 1) + '行第' + (i % cols + 1) + '列'; }
+  function stepText(s){
+    if (s.kind === 'elim') return '消除 ' + pos(s.a) + ' ↔ ' + pos(s.b);
+    const dir = { U:'上', D:'下', L:'左', R:'右' }[s.dir] || s.dir;
+    return pos(s.from) + ' 向' + dir + '滑 ' + s.dist + ' 格 → ' + pos(s.to);
+  }
+
+  function showResult(res, ms){
+    result = res;
+    const steps = res.solved ? res.steps : (res.bestSteps || []);
+    active = -1;
+    $('#pos').textContent = steps.length ? '0 / ' + steps.length : '—';
+
+    if (res.solved){
+      setStatus('解出来了：<b>' + steps.length + '</b> 步，搜索 ' + (res.nodes || 0) + ' 个节点，用时 ' + (res.elapsedMs ?? ms) + ' ms。');
+    } else if (res.exhausted){
+      setStatus('这盘是死局：穷举完也清不空，剩 ' + (res.bestRemaining ?? '?') + ' 块。' , true);
+    } else {
+      setStatus('时间不够，只搜到部分结果（剩 ' + (res.bestRemaining ?? '?') + ' 块）。', true);
+    }
+
+    stepsEl.innerHTML = '';
+    if (!steps.length){
+      stepsEl.innerHTML = '<li class="empty">没有可执行的步骤。</li>';
+      return;
+    }
+    steps.forEach((s, idx) => {
+      const li = document.createElement('li');
+      li.innerHTML = '<span class="k">' + (idx + 1) + '</span>' +
+        '<span class="t"><span class="kind ' + s.kind + '">' + (s.kind === 'elim' ? '点击' : '滑动') +
+        '</span>' + stepText(s) + '</span>';
+      li.onclick = () => { stopPlay(); setActive(idx); };
+      stepsEl.appendChild(li);
+    });
+    setActive(0);
+  }
+
+  function clearHL(){
+    for (const el of boardEl.children){ el.classList.remove('hl', 'hl2'); }
+  }
+
+  function setActive(idx){
+    const steps = result ? (result.solved ? result.steps : (result.bestSteps || [])) : [];
+    if (!steps.length) return;
+    active = Math.max(0, Math.min(idx, steps.length - 1));
+    clearHL();
+    const s = steps[active];
+    const mark = (i, cls) => { const el = boardEl.children[i]; if (el) el.classList.add(cls); };
+    if (s.kind === 'elim'){
+      mark(s.a, 'hl'); mark(s.b, 'hl');
+    } else {
+      mark(s.from, 'hl'); mark(s.to, 'hl2');
+      if (s.partner != null) mark(s.partner, 'hl2');
+      (s.pushed || []).forEach(p => mark(p.from, 'hl2'));
+    }
+    [...stepsEl.children].forEach((li, i) => li.classList.toggle('on', i === active));
+    const on = stepsEl.children[active];
+    if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+    $('#pos').textContent = (active + 1) + ' / ' + steps.length;
+  }
+
+  function stopPlay(){
+    if (timer){ clearInterval(timer); timer = null; $('#play').textContent = '播放'; }
+  }
+
+  function togglePlay(){
+    if (timer){ stopPlay(); return; }
+    const steps = result ? (result.solved ? result.steps : (result.bestSteps || [])) : [];
+    if (!steps.length) return;
+    $('#play').textContent = '暂停';
+    timer = setInterval(() => {
+      if (active >= steps.length - 1){ stopPlay(); return; }
+      setActive(active + 1);
+    }, 900);
+  }
+
+  function setStatus(html, isErr){
+    statusEl.innerHTML = html;
+    statusEl.classList.toggle('err', !!isErr);
+  }
+
+  /* ---------- 交互 ---------- */
+  $('#rows').onchange = (e) => { resize(+e.target.value, cols); };
+  $('#cols').onchange = (e) => { resize(rows, +e.target.value); };
+  function resize(r, c){
+    r = Math.max(2, Math.min(20, r || 8));
+    c = Math.max(2, Math.min(20, c || 8));
+    const old = cells, oldR = rows, oldC = cols;
+    rows = r; cols = c;
+    cells = new Array(rows * cols).fill(0);
+    for (let y = 0; y < Math.min(oldR, rows); y++)
+      for (let x = 0; x < Math.min(oldC, cols); x++)
+        cells[y * cols + x] = old[y * oldC + x];
+    $('#rows').value = rows; $('#cols').value = cols;
+    result = null; active = -1;
+    stepsEl.innerHTML = '<li class="empty">还没有求解结果。</li>';
+    $('#pos').textContent = '—';
+    buildBoard();
+    setStatus('左键点涂，按住拖动可连涂；右键擦除。');
+  }
+
+  $('#clear').onclick = () => {
+    stopPlay();
+    cells = new Array(rows * cols).fill(0);
+    result = null; active = -1;
+    stepsEl.innerHTML = '<li class="empty">还没有求解结果。</li>';
+    $('#pos').textContent = '—';
+    render();
+    setStatus('已清空。');
+  };
+
+  $('#sample').onclick = () => {
+    stopPlay();
+    cells = new Array(rows * cols).fill(0);
+    const total = rows * cols;
+    const pairs = Math.floor(total / 2);
+    const pool = [];
+    for (let i = 0; i < pairs; i++) pool.push(i % 6 + 1, i % 6 + 1);
+    while (pool.length < total) pool.push(0);
+    for (let i = pool.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    cells = pool;
+    result = null; active = -1;
+    stepsEl.innerHTML = '<li class="empty">还没有求解结果。</li>';
+    $('#pos').textContent = '—';
+    render();
+    setStatus('已生成随机棋盘，点“求解”试试。');
+  };
+
+  $('#solve').onclick = solve;
+  $('#prev').onclick = () => { stopPlay(); setActive(active - 1); };
+  $('#next').onclick = () => { stopPlay(); setActive(active + 1); };
+  $('#play').onclick = togglePlay;
+
+  buildPalette();
+  buildBoard();
+})();
+</script>
+</body>
+</html>
