@@ -695,6 +695,33 @@
           }
         }
 
+        // 这游戏每种物品成对出现：若出现奇数数量的类，且与另一个奇数类高度相似，
+        // 说明是同一物品被拆开了（移动端解码/采样差异常见），合并回去
+        {
+          const oddList = [];
+          for (let k = 0; k < counts.length; k++) if (counts[k] % 2 === 1) oddList.push(k);
+          const used = new Set();
+          for (let a = 0; a < oddList.length; a++){
+            const ka = oddList[a];
+            if (used.has(ka) || !counts[ka]) continue;
+            let bestK = -1, bestS = -1;
+            for (let b = a + 1; b < oddList.length; b++){
+              const kb = oddList[b];
+              if (used.has(kb) || !counts[kb]) continue;
+              const ra = assign.indexOf(ka), rb = assign.indexOf(kb);
+              if (ra < 0 || rb < 0) continue;
+              const s = Math.max(simToCenter(V[ra], centers[kb]), simToCenter(V[rb], centers[ka]));
+              if (s > bestS){ bestS = s; bestK = kb; }
+            }
+            if (bestK >= 0 && bestS >= 0.85){
+              for (let i = 0; i < n; i++) if (assign[i] === bestK) assign[i] = ka;
+              counts[ka] += counts[bestK];
+              counts[bestK] = 0;
+              used.add(ka); used.add(bestK);
+            }
+          }
+        }
+
         const remap = new Map();
         let k = 0;
         for (let i = 0; i < n; i++){
