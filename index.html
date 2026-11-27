@@ -183,6 +183,7 @@
   let img = null;
   let rows = 14, cols = 10;
   let box = { l: 0, t: 0, w: 100, h: 100 };
+  let grid = null;   // 自动检测出的精确格线（像素坐标）
   let labels = null;
   let items = [];
   let selItem = -1;
@@ -192,8 +193,8 @@
   /* ============ 识别参数 ============ */
   const S = 28;
   const OFFS = [];
-  for (const dy of [-1.5, -0.5, 0.5, 1.5])
-    for (const dx of [-1.5, -0.5, 0.5, 1.5]) OFFS.push([dx, dy]);
+  for (const dy of [-4.5, -1.5, 1.5, 4.5])
+    for (const dx of [-4.5, -1.5, 1.5, 4.5]) OFFS.push([dx, dy]);
   const ASSIGN = 0.88;
   const MERGE  = 0.90;
   const REF = 4;
@@ -247,76 +248,269 @@
     const cx = cv.getContext('2d', { willReadFrequently: true });
     cx.drawImage(img, 0, 0);
     const d = cx.getImageData(0, 0, W, H).data;
+    const N = rows * cols;
 
-    // 竖分隔线是深蓝色（约 26,114,167 ~ 48,133,183）
-    const colHits = new Uint32Array(W);
-    for (let y = 0; y < H; y++){
-      const base = y * W * 4;
-      for (let x = 0; x < W; x++){
-        const i = base + x * 4, r = d[i], g = d[i+1], b = d[i+2];
-        if (r >= 15 && r <= 70 && g >= 95 && g <= 150 && b >= 150 && b <= 205) colHits[x]++;
-      }
+    // 主色（格子底色）
+    const hist = new Map();
+    for (let i = 0; i < d.length; i += 36){
+      const k = ((d[i] >> 3) << 10) | ((d[i+1] >> 3) << 5) | (d[i+2] >> 3);
+      hist.set(k, (hist.get(k) || 0) + 1);
     }
-    const peaks = (arr, minVal) => {
-      const raw = [];
-      for (let i = 1; i < arr.length - 1; i++)
-        if (arr[i] >= minVal && arr[i] >= arr[i-1] && arr[i] >= arr[i+1]) raw.push(i);
-      const out = [];
-      for (let i = 0; i < raw.length; i++){
-        let j = i, sum = raw[i], cnt = 1;
-        while (j + 1 < raw.length && raw[j+1] - raw[j] <= 3){ j++; sum += raw[j]; cnt++; }
-        out.push(sum / cnt);
-        i = j;
-      }
-      return out;
+    let bk = 0, bv = -1;
+    for (const [k, v] of hist) if (v > bv){ bv = v; bk = k; }
+    const bg = { r: ((bk >> 10) & 31) * 8 + 4, g: ((bk >> 5) & 31) * 8 + 4, b: (bk & 31) * 8 + 4 };
+
+    const weightAt = (x, y) => {
+      const i = (y * W + x) * 4;
+      const dd = Math.max(Math.abs(d[i] - bg.r), Math.abs(d[i+1] - bg.g), Math.abs(d[i+2] - bg.b));
+      return dd > 18 ? dd - 18 : 0;
     };
-    const xs = peaks(colHits, H * 0.45);
-    let x0 = 0, y0 = 0, pw = 0, ph = 0;
 
-    if (xs.length >= cols + 1){
-      const first = xs[0], last = xs[xs.length - 1];
-      pw = (last - first) / (xs.length - 1);
-      x0 = first;
-    }
+    // 用「每列/每行图标质心」精修：偏移与格距一起拟合
+    const refine = (xs0, ys0) => {
+      const cxSum = new Array(cols).fill(0), cxN = new Array(cols).fill(0);
+      const cySum = new Array(rows).fill(0), cyN = new Array(rows).fill(0);
+      let err = 0, cnt = 0;
+      for (let r = 0; r < rows; r++){
+        for (let c = 0; c < cols; c++){
+          const x0 = xs0[c], x1 = xs0[c+1], y0 = ys0[r], y1 = ys0[r+1];
+          const w = x1 - x0, h = y1 - y0;
+          if (!(w > 4 && h > 4)) continue;
+          let sx = 0, sy = 0, sw = 0;
+          const ix0 = Math.max(0, Math.round(x0 + w * 0.08)), ix1 = Math.min(W, Math.round(x1 - w * 0.08));
+          const iy0 = Math.max(0, Math.round(y0 + h * 0.08)), iy1 = Math.min(H, Math.round(y1 - h * 0.08));
+          for (let y = iy0; y < iy1; y += 2){
+            for (let x = ix0; x < ix1; x += 2){
+              const wgt = weightAt(x, y);
+              if (!wgt) continue;
+              sx += wgt * x; sy += wgt * y; sw += wgt;
+            }
+          }
+          if (!(sw > 0)) continue;
+          const ccx = sx / sw, ccy = sy / sw;
+          cxSum[c] += ccx; cxN[c]++;
+          cySum[r] += ccy; cyN[r]++;
+          err += Math.abs(ccx - (x0 + x1) / 2) / w + Math.abs(ccy - (y0 + y1) / 2) / h;
+          cnt++;
+        }
+      }
+      if (!cnt) return null;
+      const fitLine = (sums, ns, count) => {
+        const kx = [], ky = [];
+        for (let k = 0; k < count; k++) if (ns[k] > 0){ kx.push(k); ky.push(sums[k] / ns[k]); }
+        if (kx.length < count * 0.7) return null;
+        let sx = 0, sy = 0, sxx = 0, sxy = 0;
+        const n = kx.length;
+        for (let i = 0; i < n; i++){ sx += kx[i]; sy += ky[i]; sxx += kx[i]*kx[i]; sxy += kx[i]*ky[i]; }
+        const den = n * sxx - sx * sx;
+        if (!den) return null;
+        const pb = (n * sxy - sx * sy) / den;
+        const pa = (sy - pb * sx) / n;
+        return pb > 4 ? { center0: pa, pitch: pb } : null;
+      };
+      const fx = fitLine(cxSum, cxN, cols);
+      const fy = fitLine(cySum, cyN, rows);
+      if (!fx || !fy) return null;
+      const nxs = [], nys = [];
+      for (let k = 0; k <= cols; k++) nxs.push(Math.round(fx.center0 - fx.pitch / 2 + fx.pitch * k));
+      for (let k = 0; k <= rows; k++) nys.push(Math.round(fy.center0 - fy.pitch / 2 + fy.pitch * k));
+      for (let k = 1; k < nxs.length; k++) if (nxs[k] <= nxs[k-1]) nxs[k] = nxs[k-1] + 1;
+      for (let k = 1; k < nys.length; k++) if (nys[k] <= nys[k-1]) nys[k] = nys[k-1] + 1;
+      return { xs: nxs, ys: nys, err: err / cnt };
+    };
 
-    // 横缝是接近纯白的线，只在棋盘列范围内统计
-    const rx0 = Math.max(0, Math.round(x0)), rx1 = Math.min(W - 1, Math.round(x0 + pw * cols));
-    if (pw > 0 && rx1 > rx0){
-      const rowHits = new Uint32Array(H);
-      const span = rx1 - rx0 + 1;
-      for (let y = 0; y < H; y++){
+    const cands = [];
+
+    // ---- 方案 0：蓝白皮肤（深蓝竖线 + 白色横缝）----
+    {
+      const colHits = new Uint32Array(W);
+      for (let y = 0; y < H; y += 2){
         const base = y * W * 4;
-        for (let x = rx0; x <= rx1; x++){
-          const i = base + x * 4;
-          if (d[i] > 244 && d[i+1] > 248 && d[i+2] > 248) rowHits[y]++;
+        for (let x = 0; x < W; x++){
+          const i = base + x * 4, r = d[i], g = d[i+1], b = d[i+2];
+          if (r >= 15 && r <= 70 && g >= 95 && g <= 150 && b >= 150 && b <= 205) colHits[x]++;
         }
       }
-      let ys = peaks(rowHits, span * 0.55);
-      if (ys.length >= 3){
-        const diffs = [];
-        for (let i = 1; i < ys.length; i++) diffs.push(ys[i] - ys[i-1]);
-        diffs.sort((a, b) => a - b);
-        const med = diffs[Math.floor(diffs.length / 2)];
-        // 先掐掉首尾的零散噪点，再过滤内部异常间距
-        while (ys.length > 1 && (ys[1] - ys[0]) < med * 0.8) ys.shift();
-        while (ys.length > 1 && (ys[ys.length-1] - ys[ys.length-2]) < med * 0.8) ys.pop();
-        ys = ys.filter((y, i) => i === 0 || (y - ys[i-1]) > med * 0.6);
-        if (ys.length >= rows){
-          ph = (ys[rows - 1] - ys[0]) / (rows - 1);
-          y0 = ys[0];
+      const cps = [];
+      for (let x = 1; x < W - 1; x++){
+        if (colHits[x] > H * 0.22 && colHits[x] >= colHits[x-1] && colHits[x] >= colHits[x+1]){
+          if (!cps.length || x - cps[cps.length-1] > 3) cps.push(x);
+        }
+      }
+      if (cps.length >= cols){
+        const x0 = cps[0], x1 = cps[cps.length - 1];
+        const px = (x1 - x0) / (cps.length - 1);
+        const rx0 = Math.max(0, x0), rx1 = Math.min(W - 1, x1);
+        const span = rx1 - rx0 + 1;
+        const rowHits = new Uint32Array(H);
+        for (let y = 0; y < H; y++){
+          const base = y * W * 4;
+          for (let x = rx0; x <= rx1; x++){
+            const i = base + x * 4;
+            if (d[i] > 244 && d[i+1] > 248 && d[i+2] > 248) rowHits[y]++;
+          }
+        }
+        const rps = [];
+        for (let y = 1; y < H - 1; y++){
+          if (rowHits[y] > span * 0.5 && rowHits[y] >= rowHits[y-1] && rowHits[y] >= rowHits[y+1]){
+            if (!rps.length || y - rps[rps.length-1] > 3) rps.push(y);
+          }
+        }
+        if (rps.length >= 2){
+          const diffs = [];
+          for (let i = 1; i < rps.length; i++) diffs.push(rps[i] - rps[i-1]);
+          diffs.sort((a, b) => a - b);
+          const py = diffs[Math.floor(diffs.length / 2)];
+          const xs = [], ys = [];
+          for (let k = 0; k <= cols; k++) xs.push(Math.round(x0 + px * k));
+          for (let k = 0; k <= rows; k++) ys.push(Math.round(rps[0] + py * k));
+          cands.push({ xs, ys });
         }
       }
     }
 
-    if (!(pw > 4 && ph > 4)){
-      box = { l: 0, t: 0, w: 100, h: 100 };
-      syncCalib(); return;
+    // ---- 方案 A：格子底色连通域（纯色皮肤）----
+    {
+      const step = 2;
+      const mw = Math.floor(W / step), mh = Math.floor(H / step);
+      const mask = new Uint8Array(mw * mh);
+      let bgCount = 0;
+      for (let y = 0; y < mh; y++){
+        for (let x = 0; x < mw; x++){
+          const i = ((y * step) * W + x * step) * 4;
+          const ok = Math.abs(d[i] - bg.r) <= 12 && Math.abs(d[i+1] - bg.g) <= 12 && Math.abs(d[i+2] - bg.b) <= 12;
+          mask[y * mw + x] = ok ? 1 : 0;
+          if (ok) bgCount++;
+        }
+      }
+      if (bgCount > mw * mh * 0.25 && bgCount < mw * mh * 0.85){
+        const labels = new Int32Array(mw * mh).fill(-1);
+        const stack = new Int32Array(mw * mh);
+        const blobs = [];
+        const minArea = (mw / cols) * (mh / rows) * 0.12;
+        for (let p = 0; p < mask.length; p++){
+          if (!mask[p] || labels[p] >= 0) continue;
+          let sp = 0; stack[sp++] = p; labels[p] = blobs.length;
+          let bx0 = mw, by0 = mh, bx1 = -1, by1 = -1, area = 0;
+          while (sp){
+            const q = stack[--sp];
+            const qy = (q / mw) | 0, qx = q % mw;
+            area++;
+            if (qx < bx0) bx0 = qx;
+            if (qx > bx1) bx1 = qx;
+            if (qy < by0) by0 = qy;
+            if (qy > by1) by1 = qy;
+            if (qx > 0){ const n = q - 1; if (mask[n] && labels[n] < 0){ labels[n] = blobs.length; stack[sp++] = n; } }
+            if (qx < mw - 1){ const n = q + 1; if (mask[n] && labels[n] < 0){ labels[n] = blobs.length; stack[sp++] = n; } }
+            if (qy > 0){ const n = q - mw; if (mask[n] && labels[n] < 0){ labels[n] = blobs.length; stack[sp++] = n; } }
+            if (qy < mh - 1){ const n = q + mw; if (mask[n] && labels[n] < 0){ labels[n] = blobs.length; stack[sp++] = n; } }
+          }
+          if (area > minArea) blobs.push({ x0: bx0, y0: by0, x1: bx1, y1: by1 });
+        }
+        if (blobs.length >= N * 0.85 && blobs.length <= N * 1.5){
+          const fitAxis = (vals, count) => {
+            const s = vals.slice().sort((a, b) => a - b);
+            const tol = (s[s.length-1] - s[0]) / count * 0.6;
+            const groups = [];
+            let cur = [s[0]];
+            for (let i = 1; i < s.length; i++){
+              if (s[i] - cur[cur.length-1] <= tol) cur.push(s[i]);
+              else { groups.push(cur); cur = [s[i]]; }
+            }
+            groups.push(cur);
+            if (groups.length !== count) return null;
+            const means = groups.map(g => g.reduce((a, b) => a + b, 0) / g.length);
+            let sx = 0, sy = 0, sxx = 0, sxy = 0;
+            for (let k = 0; k < count; k++){ sx += k; sy += means[k]; sxx += k*k; sxy += k*means[k]; }
+            const den = count * sxx - sx * sx;
+            if (!den) return null;
+            const pb = (count * sxy - sx * sy) / den;
+            return pb > 4 ? { center0: (sy - pb * sx) / count, pitch: pb } : null;
+          };
+          const fx = fitAxis(blobs.map(b => (b.x0 + b.x1) / 2 * step), cols);
+          const fy = fitAxis(blobs.map(b => (b.y0 + b.y1) / 2 * step), rows);
+          if (fx && fy){
+            const xs = [], ys = [];
+            for (let k = 0; k <= cols; k++) xs.push(Math.round(fx.center0 - fx.pitch/2 + fx.pitch*k));
+            for (let k = 0; k <= rows; k++) ys.push(Math.round(fy.center0 - fy.pitch/2 + fy.pitch*k));
+            cands.push({ xs, ys });
+          }
+        }
+      }
     }
+
+    // ---- 方案 B：梯度自相关 ----
+    {
+      const lum = (i) => d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
+      const rowE = new Float64Array(H), colE = new Float64Array(W);
+      for (let y = 0; y < H - 1; y++){
+        const b1 = y * W * 4, b2 = (y + 1) * W * 4;
+        let s = 0;
+        for (let x = 0; x < W; x += 2) s += Math.abs(lum(b1 + x * 4) - lum(b2 + x * 4));
+        rowE[y] = s;
+      }
+      for (let x = 0; x < W - 1; x++){
+        let s = 0;
+        for (let y = 0; y < H; y += 2) s += Math.abs(lum((y * W + x) * 4) - lum((y * W + x + 1) * 4));
+        colE[x] = s;
+      }
+      const axis = (prof, count, len) => {
+        const approx = len / count;
+        const lo = Math.max(8, Math.floor(approx * 0.8));
+        const hi = Math.min(len - 2, Math.ceil(approx * 1.2));
+        if (hi <= lo + 2) return null;
+        let mean = 0;
+        for (let i = 0; i < len; i++) mean += prof[i];
+        mean /= len;
+        let bestLag = lo, bestC = -2;
+        for (let lag = lo; lag <= hi; lag++){
+          let num = 0, da = 0, db = 0;
+          for (let i = 0; i + lag < len; i++){
+            const a = prof[i] - mean, b = prof[i + lag] - mean;
+            num += a * b; da += a * a; db += b * b;
+          }
+          const c = num / (Math.sqrt(da * db) || 1);
+          if (c > bestC){ bestC = c; bestLag = lag; }
+        }
+        const scoreAt = (off, p) => {
+          let s = 0, k = 0;
+          for (let x = off; x < len - 1; x += p){ s += prof[Math.round(x)]; k++; }
+          return k >= 3 ? s : -1;
+        };
+        let bo = -1, bp = bestLag, bof = 0;
+        for (let dp = -2; dp <= 2.0001; dp += 0.1){
+          const p = bestLag + dp;
+          if (p < lo * 0.9) continue;
+          for (let off = 0; off < Math.round(p); off++){
+            const s = scoreAt(off, p);
+            if (s > bo){ bo = s; bp = p; bof = off; }
+          }
+        }
+        let origin = bof;
+        if (origin > bp * 0.6) origin -= bp;
+        const out = [];
+        for (let k = 0; k <= count; k++) out.push(Math.round(origin + bp * k));
+        return out;
+      };
+      const xs = axis(colE, cols, W), ys = axis(rowE, rows, H);
+      if (xs && ys) cands.push({ xs, ys });
+    }
+
+    if (!cands.length){ grid = null; box = { l: 0, t: 0, w: 100, h: 100 }; syncCalib(); return; }
+
+    let best = null;
+    for (const c of cands){
+      const r = refine(c.xs, c.ys);
+      if (r && (!best || r.err < best.err)) best = r;
+    }
+    if (!best){ grid = null; box = { l: 0, t: 0, w: 100, h: 100 }; syncCalib(); return; }
+
+    grid = { xs: best.xs, ys: best.ys };
     box = {
-      l: x0 / W * 100,
-      t: y0 / H * 100,
-      w: (pw * cols) / W * 100,
-      h: (ph * rows) / H * 100,
+      l: Math.max(0, best.xs[0]) / W * 100,
+      t: Math.max(0, best.ys[0]) / H * 100,
+      w: (best.xs[cols] - best.xs[0]) / W * 100,
+      h: (best.ys[rows] - best.ys[0]) / H * 100,
     };
     syncCalib();
   }
@@ -331,6 +525,7 @@
   let calibTimer = null;
   [['cL','vL','l'],['cT','vT','t'],['cW','vW','w'],['cH','vH','h']].forEach(([id, vid, key]) => {
     $('#' + id).addEventListener('input', (e) => {
+      grid = null;
       box[key] = parseFloat(e.target.value);
       $('#' + vid).textContent = box[key].toFixed(1) + '%';
       clearTimeout(calibTimer);
@@ -339,20 +534,27 @@
   });
 
   /* ============ 切块 + 特征 ============ */
-  function computeVectors(){
+  function cellRect(r, c){
+    if (grid && grid.xs.length === cols + 1 && grid.ys.length === rows + 1){
+      return { x: grid.xs[c], y: grid.ys[r], w: grid.xs[c+1] - grid.xs[c], h: grid.ys[r+1] - grid.ys[r] };
+    }
     const b = boxPx();
     const cw = b.w / cols, ch = b.h / rows;
+    return { x: b.x + c * cw, y: b.y + r * ch, w: cw, h: ch };
+  }
+
+  function computeVectors(){
     const inset = 0.07;
-    const N = 4;                          // 16 个平移版本拼成 4×4
+    const N = 4;
     const cv = document.createElement('canvas');
     cv.width = cv.height = S * N;
     const cx = cv.getContext('2d', { willReadFrequently: true });
     const out = [];
     for (let r = 0; r < rows; r++){
       for (let c = 0; c < cols; c++){
-        const sx = b.x + c * cw + cw * inset;
-        const sy = b.y + r * ch + ch * inset;
-        const sw = cw * (1 - 2 * inset), sh = ch * (1 - 2 * inset);
+        const q = cellRect(r, c);
+        const sx = q.x + q.w * inset, sy = q.y + q.h * inset;
+        const sw = q.w * (1 - 2 * inset), sh = q.h * (1 - 2 * inset);
         cx.clearRect(0, 0, cv.width, cv.height);
         OFFS.forEach(([dx, dy], k) => {
           const ox = (k % N) * S, oy = Math.floor(k / N) * S;
@@ -374,9 +576,9 @@
           }
           mean /= (S * S * 3);
           let n = 0;
-          for (let q = 0; q < v.length; q++){ v[q] -= mean; n += v[q] * v[q]; }
+          for (let q2 = 0; q2 < v.length; q2++){ v[q2] -= mean; n += v[q2] * v[q2]; }
           n = Math.sqrt(n) || 1;
-          for (let q = 0; q < v.length; q++) v[q] /= n;
+          for (let q2 = 0; q2 < v.length; q2++) v[q2] /= n;
           vs.push(v);
         }
         out.push(vs);
@@ -521,15 +723,14 @@
   }
 
   function makeThumb(idx){
-    const b = boxPx();
-    const cw = b.w / cols, ch = b.h / rows;
     const r = Math.floor(idx / cols), c = idx % cols;
+    const q = cellRect(r, c);
     const cv = document.createElement('canvas'); cv.width = cv.height = 72;
     const cx = cv.getContext('2d');
     const pad = 0.04;
     cx.drawImage(img,
-      b.x + c * cw + cw * pad, b.y + r * ch + ch * pad,
-      cw * (1 - 2 * pad), ch * (1 - 2 * pad), 0, 0, 72, 72);
+      q.x + q.w * pad, q.y + q.h * pad,
+      q.w * (1 - 2 * pad), q.h * (1 - 2 * pad), 0, 0, 72, 72);
     return cv.toDataURL('image/png');
   }
 
@@ -656,7 +857,8 @@
     $('#pos').textContent = steps.length ? `0 / ${steps.length}` : '—';
 
     if (res.solved) setStatus(`解出来了：<b>${steps.length}</b> 步，搜索 ${res.nodes || 0} 个节点，用时 ${res.elapsedMs ?? 0} ms。`);
-    else if (res.exhausted) setStatus(`这盘是死局：穷举完也清不空，剩 ${res.bestRemaining ?? '?'} 块。`, true);
+    else if (res.exhausted) setStatus(`按当前识别这盘是死局（穷举完也清不空，剩 ${res.bestRemaining ?? '?'} 块）。` +
+      ' 如果官网能解，多半是棋盘读错了——先核对高亮格，或用「网格校准」微调后重新识别。', true);
     else setStatus(`时间不够，只搜到部分结果（剩 ${res.bestRemaining ?? '?'} 块）。`, true);
 
     stepsEl.innerHTML = '';
@@ -711,8 +913,8 @@
   }
 
   /* ============ 事件 ============ */
-  $('#rows').onchange = (e) => { rows = Math.max(2, Math.min(20, +e.target.value || 14)); e.target.value = rows; if (img) recognize(); };
-  $('#cols').onchange = (e) => { cols = Math.max(2, Math.min(20, +e.target.value || 10)); e.target.value = cols; if (img) recognize(); };
+  $('#rows').onchange = (e) => { rows = Math.max(2, Math.min(20, +e.target.value || 14)); e.target.value = rows; if (img){ grid = null; autoDetect(); recognize(); } };
+  $('#cols').onchange = (e) => { cols = Math.max(2, Math.min(20, +e.target.value || 10)); e.target.value = cols; if (img){ grid = null; autoDetect(); recognize(); } };
   $('#btnAgain').onclick = recognize;
   $('#btnSolve').onclick = solve;
   $('#prev').onclick = () => { stopPlay(); setActive(active - 1); };
