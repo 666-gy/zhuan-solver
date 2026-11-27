@@ -283,6 +283,23 @@
   let baseCells = null;    // 初始棋盘（物品 id，-1 为空）
   let editing = false;
   let NEXT_ICON = '';
+
+  // 移动端对大 canvas 的 getImageData 会失败或返回空数据，统一先缩到安全尺寸
+  const MAX_SIDE = 1600;
+  let srcCanvas = null, srcW = 0, srcH = 0;
+  function prepareSource(im){
+    const w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+    const s = Math.min(1, MAX_SIDE / Math.max(w, h));
+    srcW = Math.max(1, Math.round(w * s));
+    srcH = Math.max(1, Math.round(h * s));
+    const cv = document.createElement('canvas');
+    cv.width = srcW; cv.height = srcH;
+    const cx = cv.getContext('2d', { willReadFrequently: true });
+    cx.imageSmoothingEnabled = true;
+    cx.imageSmoothingQuality = 'high';
+    cx.drawImage(im, 0, 0, srcW, srcH);
+    srcCanvas = cv;
+  }
   let result = null, active = -1;   // 兼容核心识别流程里的旧字段
 
   const S = 28;
@@ -298,7 +315,7 @@
     statusEl.classList.toggle('err', !!isErr);
   }
   function boxPx(){
-    const W = img.naturalWidth, H = img.naturalHeight;
+    const W = srcW, H = srcH;
     return { x: W*box.l/100, y: H*box.t/100, w: W*box.w/100, h: H*box.h/100 };
   }
   const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
@@ -311,6 +328,7 @@
     im.onload = () => {
       img = im;
       URL.revokeObjectURL(url);
+      prepareSource(im);
       autoDetect();
       $('#btnAgain').disabled = false;
       $('#btnSolve').disabled = false;
@@ -335,10 +353,10 @@
   });
 
   function autoDetect(){
-    const W = img.naturalWidth, H = img.naturalHeight;
+    const W = srcW, H = srcH;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const cx = cv.getContext('2d', { willReadFrequently: true });
-    cx.drawImage(img, 0, 0);
+    cx.drawImage(srcCanvas, 0, 0);
     const d = cx.getImageData(0, 0, W, H).data;
 
     // ---------- 只依赖两条与配色无关的信号 ----------
@@ -550,7 +568,7 @@
         cx.clearRect(0, 0, cv.width, cv.height);
         OFFS.forEach(([dx, dy], k) => {
           const ox = (k % N) * S, oy = Math.floor(k / N) * S;
-          cx.drawImage(img, sx + dx, sy + dy, sw, sh, ox, oy, S, S);
+          cx.drawImage(srcCanvas, sx + dx, sy + dy, sw, sh, ox, oy, S, S);
         });
         const all = cx.getImageData(0, 0, cv.width, cv.height).data;
         const vs = [];
@@ -723,7 +741,7 @@
     const cv = document.createElement('canvas'); cv.width = cv.height = 72;
     const cx = cv.getContext('2d');
     const pad = 0.04;
-    cx.drawImage(img,
+    cx.drawImage(srcCanvas,
       q.x + q.w * pad, q.y + q.h * pad,
       q.w * (1 - 2 * pad), q.h * (1 - 2 * pad), 0, 0, 72, 72);
     return cv.toDataURL('image/png');
@@ -947,7 +965,8 @@
   }
 
   function resetAll(){
-    img = null; grid = null; labels = null; items = [];
+    img = null; srcCanvas = null; srcW = 0; srcH = 0;
+    grid = null; labels = null; items = [];
     steps = []; stepIdx = -1; baseCells = null; editing = false;
     box = { l: 0, t: 0, w: 100, h: 100 };
     selItem = -1; selCell = -1;
