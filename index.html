@@ -55,9 +55,22 @@
   body.solo aside{display:none}
 
   /* ---------- 棋盘 ---------- */
-  .board-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;
-    width:100%;max-width:calc((100vh - 250px) * var(--cols,10) / var(--rows,14) + 30px);
-    margin:0 auto}
+  .left{display:flex;flex-direction:column;gap:14px;width:100%;min-width:0;
+    max-width:calc((100vh - 250px) * var(--cols,10) / var(--rows,14) + 30px);margin:0 auto}
+  .board-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;width:100%}
+  .guide{display:none;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px 20px}
+  body.solo .guide{display:block}
+  .guide h2{margin:0 0 14px;font-size:15.5px;font-weight:800;letter-spacing:.02em;color:var(--ink)}
+  .guide ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:13px}
+  .guide li{display:flex;gap:10px;font-size:13.5px;line-height:1.9;color:var(--dim)}
+  .guide .n{flex:0 0 auto;width:20px;height:20px;border-radius:999px;background:var(--green-soft);
+    color:var(--green);font-size:11px;font-weight:800;display:grid;place-items:center;margin-top:4px}
+  .guide .txt{flex:1}
+  .guide b{color:var(--ink);font-weight:700}
+  .mini-btn{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;
+    background:var(--green);color:#fff;vertical-align:-7px;margin:0 3px;
+    box-shadow:0 1px 3px rgba(20,83,45,.22)}
+  .mini-btn svg{width:15px;height:15px}
   .stage{position:relative;border-radius:12px;background:#eef1f4;
     display:flex;align-items:center;justify-content:center;min-height:260px;overflow:hidden;
     border:1px solid #e3e7ec}
@@ -178,6 +191,7 @@
 </header>
 
 <main>
+  <div class="left">
   <section class="board-card">
     <div class="stage" id="stage">
       <img id="shot" alt="" style="display:none" />
@@ -197,6 +211,25 @@
 
     <p class="status" id="status"></p>
   </section>
+
+  <section class="guide" id="guide">
+    <h2>怎么使用本辅助：</h2>
+    <ol>
+      <li>
+        <span class="n">1</span>
+        <span class="txt">点击右上角 <span class="mini-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3L18 3C19.6569 3 21 4.3431 21 6L21 18C21 19.6569 19.6569 21 18 21L6 21C4.3431 21 3 19.6569 3 18L3 6C3 4.3431 4.3431 3 6 3ZM3 18L7.9393 13.0607C8.5251 12.4749 9.4749 12.4749 10.0607 13.0607L12.0801 15.0801C12.6079 15.6079 13.4436 15.6673 14.0408 15.2194L15.9592 13.7806C16.5564 13.3327 17.3921 13.3921 17.9199 13.9199L21 17"/><path d="M9.5 7.5C9.5 8.3284 8.8284 9 8 9C7.1716 9 6.5 8.3284 6.5 7.5C6.5 6.6716 7.1716 6 8 6C8.8284 6 9.5 6.6716 9.5 7.5Z" fill="currentColor" stroke="none"/></svg></span> <b>图像按钮</b>，上传<b>棋盘截图</b>。</span>
+      </li>
+      <li>
+        <span class="n">2</span>
+        <span class="txt">确认<b>棋盘识别正常</b>，随后点击右上角 <span class="mini-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.3184 20.5112L3.0341 3.9139C2.8602 3.3677 3.3816 2.8558 3.9268 3.0373L20.5197 8.5617C21.1361 8.7669 21.1671 9.6243 20.5672 9.8732L13.4774 12.8146C13.3157 12.8817 13.1848 13.0065 13.1107 13.1647L9.6254 20.596C9.3541 21.174 8.5121 21.1195 8.3184 20.5112Z"/></svg></span> <b>发送按钮</b>，<b>开始破砖</b>。</span>
+      </li>
+      <li>
+        <span class="n">3</span>
+        <span class="txt">如果你发现<b>识别有问题</b>，可尝试点击右上角 <span class="mini-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.7883 13.9407C20.929 13.3034 21 12.6527 21 12C21 7.0294 16.9706 3 12 3C9.5169 3 7.1441 4.0259 5.4432 5.8349M4.2857 3L4.7293 6.105C4.7683 6.3784 5.0216 6.5683 5.295 6.5293L8.4 6.0857M3.2117 10.0593C3.071 10.6966 3 11.3473 3 12C3 16.9706 7.0294 21 12 21C14.4831 21 16.8559 19.9741 18.5568 18.1651M19.7143 21L19.2707 17.895C19.2317 17.6216 18.9784 17.4317 18.705 17.4707L15.6 17.9143"/></svg></span> <b>刷新按钮</b>重新识别。</span>
+      </li>
+    </ol>
+  </section>
+  </div>
 
   <aside class="side" id="side">
     <section class="card" id="stepCard">
@@ -697,7 +730,7 @@
     $('#dropHint').style.display = 'none';
     boardEl.style.gridTemplateColumns = `repeat(${cols}, minmax(0,1fr))`;
     boardEl.style.setProperty('--cols', cols);
-    const bc = document.querySelector('.board-card');
+    const bc = document.querySelector('.left');
     if (bc){ bc.style.setProperty('--cols', cols); bc.style.setProperty('--rows', rows); }
     boardEl.style.setProperty('--rows', rows);
     boardEl.innerHTML = '';
