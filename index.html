@@ -125,6 +125,10 @@
   .round-btn:hover{border-color:#cfc9ba;background:#faf8f2;color:var(--ink)}
   .round-btn:disabled{opacity:.35;cursor:not-allowed;background:#fff;color:#9aa1a9}
   #range{flex:1;min-width:60px;accent-color:#16a34a;height:4px}
+  .round-btn.done{width:auto;padding:0 16px;border-radius:999px;background:var(--green);
+    border-color:var(--green);color:#fff;font-size:13px;font-weight:700;white-space:nowrap;
+    letter-spacing:.02em}
+  .round-btn.done:hover{background:#0f3f22;border-color:#0f3f22;color:#fff}
 
   .play{display:flex;align-items:center;gap:10px}
   .play .btn{flex-shrink:0}
@@ -278,6 +282,7 @@
   let stepIdx = -1;        // 当前步（0 基）
   let baseCells = null;    // 初始棋盘（物品 id，-1 为空）
   let editing = false;
+  let NEXT_ICON = '';
   let result = null, active = -1;   // 兼容核心识别流程里的旧字段
 
   const S = 28;
@@ -917,12 +922,64 @@
       ' 跟游戏里对不上就按 <b>Esc</b> 改识别结果。';
 
     $('#prev').disabled = stepIdx <= 0;
-    $('#next').disabled = stepIdx >= total - 1;
     $('#range').disabled = false;
+    setNextDone(stepIdx >= total - 1);
 
     [...stepsEl.children].forEach((li, i) => li.classList.toggle('on', i === stepIdx));
     const on = stepsEl.children[stepIdx];
     if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+  }
+
+  function setNextDone(done){
+    const b = $('#next');
+    if (!NEXT_ICON) NEXT_ICON = b.innerHTML;
+    if (done){
+      b.classList.add('done');
+      b.innerHTML = '恭喜！再来一盘';
+      b.title = '再来一盘';
+      b.disabled = false;
+    } else {
+      b.classList.remove('done');
+      b.innerHTML = NEXT_ICON;
+      b.title = '下一步';
+      b.disabled = false;
+    }
+  }
+
+  function resetAll(){
+    img = null; grid = null; labels = null; items = [];
+    steps = []; stepIdx = -1; baseCells = null; editing = false;
+    box = { l: 0, t: 0, w: 100, h: 100 };
+    selItem = -1; selCell = -1;
+
+    boardEl.hidden = true;
+    boardEl.innerHTML = '';
+    overlayEl.innerHTML = '';
+    $('#dropHint').style.display = '';
+    $('#boardFoot').hidden = true;
+    $('#editCard').hidden = true;
+    document.body.classList.add('solo');
+
+    $('#curStep').textContent = '0';
+    $('#totStep').textContent = '0';
+    $('#bar').style.width = '0%';
+    $('#instrPill').className = 'pill gray';
+    $('#instrPill').textContent = '点右上角光标按钮求解';
+    $('#instrThumb').className = 'thumb empty';
+    $('#instrThumb').innerHTML = '';
+    $('#tip').textContent = '';
+    stepsEl.innerHTML = '<li class="empty">还没有求解结果。</li>';
+    $('#status').textContent = '';
+    $('#status').classList.remove('err');
+
+    $('#btnSolve').disabled = true;
+    $('#btnAgain').disabled = true;
+    $('#btnSolve').classList.remove('busy');
+    $('#range').max = 0;
+    $('#range').value = 0;
+    setNextDone(false);
+    $('#prev').disabled = true;
+    $('#file').value = '';
   }
 
   function thumbOf(i){
@@ -1076,7 +1133,10 @@
   $('#btnAgain').onclick = recognize;
   $('#btnSolve').onclick = solve;
   $('#prev').onclick = () => setStep(stepIdx - 1);
-  $('#next').onclick = () => setStep(stepIdx + 1);
+  $('#next').onclick = () => {
+    if ($('#next').classList.contains('done')) { resetAll(); return; }
+    setStep(stepIdx + 1);
+  };
   $('#range').oninput = (e) => setStep(+e.target.value);
 
   function toggleEdit(){
