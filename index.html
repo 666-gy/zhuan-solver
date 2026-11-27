@@ -6,132 +6,169 @@
 <title>砖了个砖 · 本地求解器</title>
 <style>
   :root{
-    --paper:#f6f4ef; --card:#fffdf8; --line:#e2ded2; --ink:#1f2937; --dim:#6b7280;
-    --green:#14532d; --green-soft:#e8f0e9; --amber:#b45309; --red:#b91c1c; --blue:#1d4ed8;
+    --paper:#f5f3ee; --card:#fff; --line:#e5e1d6; --ink:#1c2430; --dim:#6b7280;
+    --green:#14532d; --green-2:#166534; --green-soft:#e9f2ea;
+    --blue:#2563eb; --blue-soft:#e8efff; --amber:#d97706; --red:#dc2626;
     --mono:"Cascadia Mono","JetBrains Mono",Consolas,monospace;
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--paper);color:var(--ink);
-    font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;}
-  header{height:56px;background:#fff;border-bottom:1px solid var(--line);
-    display:flex;align-items:center;justify-content:space-between;padding:0 18px;gap:12px}
-  .brand{font-weight:800;letter-spacing:.02em;color:var(--green);font-size:1.05rem;white-space:nowrap}
-  .brand small{font-weight:500;color:var(--dim);margin-left:8px;letter-spacing:0}
-  .tag{font-family:var(--mono);font-size:12px;color:var(--dim);border:1px solid var(--line);
-    border-radius:999px;padding:4px 10px;background:var(--paper);white-space:nowrap}
-  main{max-width:1120px;margin:0 auto;padding:20px 18px 56px;
-    display:grid;grid-template-columns:minmax(0,1fr) 336px;gap:20px;align-items:start}
-  @media (max-width:900px){ main{grid-template-columns:1fr} }
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit}
 
-  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
-  .panel + .panel{margin-top:16px}
-  .panel h2{margin:0 0 12px;font-size:.95rem;letter-spacing:.04em;color:var(--green);font-weight:800;
-    display:flex;align-items:center;gap:8px}
-  .panel h2 .n{font-family:var(--mono);font-size:12px;color:var(--dim);font-weight:500}
+  header{height:58px;background:#fff;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;padding:0 18px;gap:12px;
+    position:sticky;top:0;z-index:20}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:.02em;color:var(--green);font-size:1.06rem}
+  .brand i{width:9px;height:9px;border-radius:2px;background:var(--green);display:block;transform:rotate(45deg)}
+  .brand small{font-weight:500;color:var(--dim);margin-left:4px;letter-spacing:0;font-size:.82rem}
+  .hdr{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .chip{font-family:var(--mono);font-size:12px;color:var(--dim);border:1px solid var(--line);
+    border-radius:999px;padding:5px 11px;background:var(--paper);white-space:nowrap}
+  .chip.ok{color:var(--green);border-color:#c9dfcd;background:var(--green-soft)}
 
-  .bar{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:12px}
-  .bar label{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:6px}
-  input[type=number]{width:54px;padding:5px 7px;border:1px solid var(--line);border-radius:8px;
-    background:#fff;font-family:var(--mono);font-size:13px;color:var(--ink)}
-  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:9px;
-    padding:7px 13px;font-size:13px;cursor:pointer;transition:.15s;white-space:nowrap}
-  .btn:hover{border-color:#c9c4b6;background:#faf8f2}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:10px;
+    padding:8px 14px;font-size:13.5px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .btn:hover{border-color:#cfc9ba;background:#faf8f2}
   .btn.primary{background:var(--green);border-color:var(--green);color:#fff;font-weight:700}
   .btn.primary:hover{background:#0f3f22}
-  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.blue{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+  .btn.blue:hover{background:#1d4ed8}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.ghost{border-color:transparent;background:transparent;color:var(--dim)}
+  .btn.ghost:hover{background:#f3f0e8;color:var(--ink)}
 
-  .stage{position:relative;border:1px dashed #d9d4c6;border-radius:12px;background:#fff;
-    min-height:220px;display:flex;align-items:center;justify-content:center;overflow:hidden}
-  .stage.over{border-color:var(--green);background:var(--green-soft)}
-  .stage img#shot{display:none}
-  .drop-hint{color:var(--dim);font-size:13.5px;text-align:center;line-height:1.9;padding:26px 18px}
+  main{max-width:940px;margin:0 auto;padding:18px 18px 48px;
+    display:grid;grid-template-columns:minmax(0,1fr) 372px;gap:18px;align-items:start}
+  @media (max-width:940px){ main{grid-template-columns:1fr} }
+
+  /* ---------- 棋盘 ---------- */
+  .board-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;
+    width:100%;max-width:calc((100vh - 250px) * var(--cols,10) / var(--rows,14) + 30px);
+    margin:0 auto}
+  .stage{position:relative;border-radius:12px;background:#eef1f4;
+    display:flex;align-items:center;justify-content:center;min-height:260px;overflow:hidden;
+    border:1px solid #e3e7ec}
+  .stage.over{outline:2px dashed var(--green);outline-offset:-6px}
+  .drop-hint{color:var(--dim);font-size:13.5px;text-align:center;line-height:2;padding:30px 20px}
   .drop-hint b{color:var(--green)}
 
-  #board[hidden]{display:none}
-  #board{display:grid;gap:2px;width:100%;padding:6px;background:#eef4f7;border-radius:10px;
-    max-width:min(100%, calc((100vh - 260px) * var(--cols, 10) / var(--rows, 14)));margin:0 auto}
-  .cell{position:relative;aspect-ratio:1/1;border-radius:5px;background:#f7f7f2;overflow:hidden;
-    cursor:pointer;transition:box-shadow .1s, transform .08s}
-  .cell img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
-  .cell:hover{transform:scale(1.05);z-index:2}
-  .cell.sel{box-shadow:0 0 0 3px var(--blue);z-index:3}
-  .cell.hl{box-shadow:0 0 0 3px var(--amber);z-index:3}
-  .cell.hl2{box-shadow:0 0 0 3px var(--blue);z-index:3}
+  #board{position:relative;display:grid;gap:3px;padding:6px;width:100%;
+    max-width:min(100%, calc((100vh - 250px) * var(--cols,10) / var(--rows,14)));
+    margin:0 auto}
+  .cell{position:relative;aspect-ratio:1/1;border-radius:7px;background:#f2f4f6;
+    overflow:hidden;transition:transform .1s, box-shadow .12s}
+  .cell img{width:100%;height:100%;object-fit:cover;display:block}
+  .cell.empty{background:repeating-linear-gradient(45deg,#eef1f4,#eef1f4 6px,#e9edf1 6px,#e9edf1 12px)}
+  .cell.empty img{display:none}
+  .cell.sel{box-shadow:0 0 0 3px var(--blue);z-index:5}
 
-  .calib{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
-  .calib summary{cursor:pointer;font-size:13px;color:var(--dim);outline:none}
+  #overlay{position:absolute;left:0;top:0;pointer-events:none;z-index:4}
+
+  /* ---------- 右栏 ---------- */
+  .side{display:flex;flex-direction:column;gap:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 16px 18px}
+  .card h2{margin:0;font-size:15px;font-weight:800;letter-spacing:.02em}
+
+  .step-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+  .counter{font-family:var(--mono);font-size:13px;color:var(--dim)}
+  .counter b{font-size:26px;color:var(--green);font-weight:800;letter-spacing:-.02em}
+  .bar{height:6px;border-radius:999px;background:#eef0ea;margin:12px 0 16px;overflow:hidden}
+  .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#16a34a,#22c55e);
+    border-radius:999px;transition:width .25s}
+
+  .instr{display:flex;align-items:center;gap:12px;min-height:64px}
+  .instr .thumb{width:56px;height:56px;border-radius:10px;border:1px solid var(--line);
+    background:#fafaf6;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .instr .thumb img{width:100%;height:100%;object-fit:cover;border-radius:9px}
+  .instr .thumb.empty{border-style:dashed}
+  .pill{flex:1;background:var(--blue);color:#fff;border-radius:999px;padding:13px 18px;
+    font-size:20px;font-weight:800;letter-spacing:.02em;text-align:center;
+    box-shadow:0 4px 14px rgba(37,99,235,.22)}
+  .pill.gray{background:#eef0f3;color:var(--dim);box-shadow:none;font-size:15px;font-weight:600}
+  .pill .arw{font-size:22px;margin-right:6px}
+  .sub{margin:12px 0 0;font-size:12.5px;color:var(--dim);line-height:1.7}
+  .sub b{color:var(--ink);font-weight:600}
+
+  .play{display:flex;align-items:center;gap:10px}
+  .play .btn{flex-shrink:0}
+  .play .btn.big{padding:11px 14px;font-size:14px}
+  #range{flex:1;min-width:60px;accent-color:#16a34a;height:4px}
+  .keys{margin-top:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+    font-size:11.5px;color:var(--dim)}
+  kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--line);border-bottom-width:2px;
+    border-radius:5px;padding:1px 5px;background:#fbfaf6;color:#4b5563}
+
+  .tools{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .tools .btn{width:100%}
+
+  /* 物品 / 校准 */
+  .palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:8px;
+    max-height:32vh;overflow:auto;margin-top:4px}
+  .item{position:relative;border:1px solid var(--line);border-radius:9px;background:#fff;padding:4px;cursor:pointer}
+  .item:hover{border-color:#cfc9ba}
+  .item[aria-pressed=true]{border-color:var(--green);box-shadow:0 0 0 2px var(--green-soft)}
+  .item img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:6px;display:block}
+  .item .c{position:absolute;right:5px;bottom:4px;font-family:var(--mono);font-size:10px;
+    background:rgba(255,255,255,.88);border-radius:4px;padding:0 3px;color:var(--dim)}
+  .calib{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+  .calib summary{cursor:pointer;font-size:12.5px;color:var(--dim);outline:none}
   .calib .row{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12.5px;color:var(--dim)}
   .calib input[type=range]{flex:1;accent-color:var(--green)}
   .calib .v{font-family:var(--mono);width:44px;text-align:right;color:var(--ink)}
 
-  .palette .empty{grid-column:1/-1}
-  .palette{display:grid;max-height:34vh;overflow:auto;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:8px}
-  .item{position:relative;border:1px solid var(--line);border-radius:9px;background:#fff;
-    padding:4px;cursor:pointer;transition:.12s}
-  .item:hover{border-color:#c9c4b6}
-  .item[aria-pressed=true]{border-color:var(--green);box-shadow:0 0 0 2px var(--green-soft)}
-  .item img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:6px;display:block}
-  .item .c{position:absolute;right:5px;bottom:16px;font-family:var(--mono);font-size:10px;
-    background:rgba(255,255,255,.86);border-radius:4px;padding:0 3px;color:var(--dim)}
-  .item .name{display:block;font-size:10.5px;color:var(--dim);text-align:center;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
-
-  .play{display:flex;gap:8px;align-items:center;margin-bottom:10px}
-  .play .pos{font-family:var(--mono);font-size:12px;color:var(--dim);margin-left:auto}
-  #steps{list-style:none;margin:0;padding:0;max-height:340px;overflow:auto;border-top:1px solid var(--line)}
-  #steps li{display:flex;gap:8px;align-items:center;padding:8px 4px;border-bottom:1px solid #f0ede4;
-    font-size:13px;line-height:1.4;cursor:pointer}
+  #steps{list-style:none;margin:10px 0 0;padding:0;max-height:230px;overflow:auto;
+    border-top:1px solid var(--line)}
+  #steps li{display:flex;gap:8px;align-items:center;padding:7px 4px;border-bottom:1px solid #f2efe7;
+    font-size:12.5px;cursor:pointer;line-height:1.4}
   #steps li:hover{background:#faf8f2}
   #steps li.on{background:var(--green-soft)}
   #steps .k{font-family:var(--mono);font-size:11px;color:var(--dim);min-width:20px;text-align:right}
-  #steps .thumbs{display:flex;gap:3px}
-  #steps .thumbs img{width:22px;height:22px;border-radius:4px;object-fit:cover}
+  #steps .thumbs{display:flex;gap:2px}
+  #steps .thumbs img{width:20px;height:20px;border-radius:4px;object-fit:cover}
   #steps .t{flex:1}
-  #steps .kind{font-size:10.5px;border-radius:4px;padding:1px 4px;margin-right:4px;font-family:var(--mono)}
-  .kind.elim{background:#fdecec;color:#b91c1c}
-  .kind.slide{background:#e8eefc;color:#1d4ed8}
-  .empty{color:var(--dim);font-size:13px;padding:16px 4px}
-
-  .status{font-size:13px;color:var(--dim);margin-top:10px;line-height:1.6;min-height:20px}
+  .empty{color:var(--dim);font-size:12.5px;padding:14px 4px}
+  .status{font-size:12.5px;color:var(--dim);margin:10px 0 0;line-height:1.7;min-height:18px}
   .status b{color:var(--ink)}
   .status.err{color:var(--red)}
-  .hint{font-size:12px;color:var(--dim);line-height:1.7;margin:10px 0 0}
-  @media (max-width:900px){ .palette{max-height:none;overflow:visible} }
-  @media (max-width:600px){
-    header{padding:0 12px}
+  @media (max-width:640px){
+    header{height:auto;padding:8px 12px;flex-wrap:wrap;gap:8px}
+    .brand{font-size:.98rem;gap:7px}
     .brand small{display:none}
-    .tag{display:none}
-    main{padding:14px 12px 40px}
-    .palette{grid-template-columns:repeat(auto-fill,minmax(52px,1fr))}
+    .hdr{width:100%;justify-content:flex-end;gap:7px}
+    .chip{display:none}
+    .btn{padding:7px 11px;font-size:12.5px}
+    main{padding:12px 12px 36px;gap:12px}
+    .board-card{padding:10px}
+    .pill{font-size:17px;padding:11px 14px}
+    .counter b{font-size:22px}
   }
-  footer{max-width:1120px;margin:0 auto;padding:0 18px 40px;color:var(--dim);font-size:12px;line-height:1.7}
+  footer{max-width:940px;margin:0 auto;padding:0 18px 40px;color:var(--dim);font-size:12px;line-height:1.7}
   code{font-family:var(--mono);background:#efece3;padding:1px 5px;border-radius:4px}
 </style>
 </head>
 <body>
 <header>
-  <div class="brand">砖了个砖 · 本地求解器<small>引擎取自站内 solver.worker</small></div>
-  <div class="tag" id="tag">本地运行 · 不联网</div>
+  <div class="brand"><i></i>砖了个砖<small>本地求解器</small></div>
+  <div class="hdr">
+    <span class="chip" id="statChip">未上传</span>
+    <button class="btn" id="btnUpload">上传截图</button>
+    <input type="file" id="file" accept="image/*" hidden />
+    <button class="btn" id="btnAgain" disabled>重新识别</button>
+    <button class="btn primary" id="btnSolve" disabled>求解</button>
+  </div>
 </header>
 
 <main>
-  <section class="panel">
-    <div class="bar">
-      <button class="btn primary" id="btnUpload">上传截图</button>
-      <input type="file" id="file" accept="image/*" hidden />
-      <label>行 <input type="number" id="rows" min="2" max="20" value="14"></label>
-      <label>列 <input type="number" id="cols" min="2" max="20" value="10"></label>
-      <button class="btn" id="btnAgain" disabled>重新识别</button>
-      <button class="btn" id="btnSolve" disabled>求解</button>
-    </div>
-
+  <section class="board-card">
     <div class="stage" id="stage">
-      <img id="shot" alt="上传的棋盘截图" />
+      <img id="shot" alt="" style="display:none" />
       <div class="drop-hint" id="dropHint">
-        把棋盘截图拖进来，或点 <b>上传截图</b>。<br />
-        也可以直接 <b>Ctrl+V</b> 粘贴。切块与识别都在本机完成。
+        把棋盘截图拖进来，或点 <b>上传截图</b><br />
+        也可以直接 <b>Ctrl+V</b> 粘贴 · 切块与识别都在本机完成
       </div>
       <div id="board" hidden></div>
+      <svg id="overlay"></svg>
     </div>
 
     <details class="calib" id="calibBox" hidden>
@@ -140,25 +177,50 @@
       <div class="row"><span>上</span><input type="range" id="cT" min="0" max="40" step="0.2" value="0"><span class="v" id="vT">0%</span></div>
       <div class="row"><span>宽</span><input type="range" id="cW" min="30" max="100" step="0.2" value="100"><span class="v" id="vW">100%</span></div>
       <div class="row"><span>高</span><input type="range" id="cH" min="30" max="100" step="0.2" value="100"><span class="v" id="vH">100%</span></div>
+      <div class="row"><span>行</span><input type="number" id="rows" min="2" max="20" value="14" style="width:56px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-family:var(--mono)">
+        <span>列</span><input type="number" id="cols" min="2" max="20" value="10" style="width:56px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-family:var(--mono)"></div>
     </details>
 
     <p class="status" id="status">还没有截图。</p>
   </section>
 
-  <aside>
-    <section class="panel">
-      <h2>物品 <span class="n" id="itemCount"></span></h2>
-      <div class="palette" id="palette"><p class="empty">识别后这里会列出每种物品。</p></div>
-      <p class="hint">点格子选中，再点物品即可改判；双击物品可改名。</p>
+  <aside class="side">
+    <section class="card" id="stepCard">
+      <div class="step-head">
+        <h2>通关步骤</h2>
+        <div class="counter"><b id="curStep">0</b> / <span id="totStep">0</span></div>
+      </div>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="instr">
+        <div class="thumb empty" id="instrThumb"></div>
+        <div class="pill gray" id="instrPill">先上传截图</div>
+      </div>
+      <p class="sub" id="tip">识别完成后点右上角「求解」，这里会一步一步教你怎么点。</p>
     </section>
 
-    <section class="panel">
-      <h2>步骤</h2>
+    <section class="card">
       <div class="play">
-        <button class="btn" id="prev">上一步</button>
-        <button class="btn" id="play">播放</button>
-        <button class="btn" id="next">下一步</button>
-        <span class="pos" id="pos">—</span>
+        <button class="btn big" id="prev" disabled>‹ 上一步</button>
+        <input type="range" id="range" min="0" max="0" value="0" disabled />
+        <button class="btn big primary" id="next" disabled>下一步 ›</button>
+      </div>
+      <div class="keys">
+        <kbd>←</kbd><kbd>→</kbd> 翻步
+        <kbd>空格</kbd> 下一步
+        <kbd>Esc</kbd> 改识别结果
+      </div>
+    </section>
+
+    <section class="card" id="editCard" hidden>
+      <h2>物品 <span class="counter" id="itemCount"></span></h2>
+      <div class="palette" id="palette"><p class="empty">识别后这里会列出每种物品。</p></div>
+      <p class="sub">点格子选中，再点物品即可改判；双击物品可改名。</p>
+    </section>
+
+    <section class="card">
+      <div class="tools">
+        <button class="btn" id="btnEdit">改识别结果</button>
+        <button class="btn" id="btnReupload">重新上传</button>
       </div>
       <ul id="steps"><li class="empty">还没有求解结果。</li></ul>
     </section>
@@ -177,20 +239,23 @@
 
   const $ = (s) => document.querySelector(s);
   const boardEl = $('#board'), stageEl = $('#stage'), statusEl = $('#status');
-  const paletteEl = $('#palette'), stepsEl = $('#steps');
+  const paletteEl = $('#palette'), stepsEl = $('#steps'), overlayEl = $('#overlay');
 
   /* ============ 状态 ============ */
   let img = null;
   let rows = 14, cols = 10;
   let box = { l: 0, t: 0, w: 100, h: 100 };
-  let grid = null;   // 自动检测出的精确格线（像素坐标）
+  let grid = null;
   let labels = null;
   let items = [];
   let selItem = -1;
   let selCell = -1;
-  let result = null, active = -1, timer = null;
+  let steps = [];          // 求解结果
+  let stepIdx = -1;        // 当前步（0 基）
+  let baseCells = null;    // 初始棋盘（物品 id，-1 为空）
+  let editing = false;
+  let result = null, active = -1;   // 兼容核心识别流程里的旧字段
 
-  /* ============ 识别参数 ============ */
   const S = 28;
   const OFFS = [];
   for (const dy of [-4.5, -1.5, 1.5, 4.5])
@@ -228,6 +293,7 @@
   }
 
   $('#btnUpload').onclick = () => $('#file').click();
+  $('#btnReupload').onclick = () => $('#file').click();
   $('#file').onchange = (e) => { const f = e.target.files && e.target.files[0]; if (f) acceptFile(f); e.target.value = ''; };
   stageEl.addEventListener('dragover', (e) => { e.preventDefault(); stageEl.classList.add('over'); });
   stageEl.addEventListener('dragleave', () => stageEl.classList.remove('over'));
@@ -241,7 +307,6 @@
     if (it) acceptFile(it.getAsFile());
   });
 
-  /* ============ 自动找棋盘 ============ */
   function autoDetect(){
     const W = img.naturalWidth, H = img.naturalHeight;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
@@ -595,10 +660,12 @@
         selItem = -1; selCell = -1;
         result = null; active = -1;
         stepsEl.innerHTML = '<li class="empty">还没有求解结果。</li>';
-        $('#pos').textContent = '—';
 
         renderBoard();
         renderPalette();
+        const chip = document.getElementById('statChip');
+        chip.textContent = total + ' 种 · ' + n + ' 格';
+        chip.classList.add('ok');
 
         const odd = cnts.filter(x => x % 2).length;
         const ms = Math.round(performance.now() - t0);
@@ -627,64 +694,230 @@
     return cv.toDataURL('image/png');
   }
 
-  /* ============ 渲染 ============ */
-  function renderBoard(){
+  /* ============ 棋盘渲染 ============ */
+  function buildCells(){
     boardEl.hidden = false;
     $('#dropHint').style.display = 'none';
     boardEl.style.gridTemplateColumns = `repeat(${cols}, minmax(0,1fr))`;
     boardEl.style.setProperty('--cols', cols);
+    const bc = document.querySelector('.board-card');
+    if (bc){ bc.style.setProperty('--cols', cols); bc.style.setProperty('--rows', rows); }
     boardEl.style.setProperty('--rows', rows);
     boardEl.innerHTML = '';
     for (let i = 0; i < rows * cols; i++){
       const d = document.createElement('div');
       d.className = 'cell';
       d.dataset.i = i;
-      const lab = labels ? labels[i] : -1;
-      if (lab >= 0 && items[lab]) d.innerHTML = `<img src="${items[lab].thumb}" alt="">`;
-      d.addEventListener('click', () => {
-        selCell = i;
-        [...boardEl.children].forEach((el, k) => el.classList.toggle('sel', k === i));
-        if (selItem >= 0) setCell(i, selItem);
-        else setStatus(`选中第 ${Math.floor(i / cols) + 1} 行第 ${i % cols + 1} 列，点右侧物品可改判。`);
-      });
+      d.addEventListener('click', () => onCellClick(i));
       boardEl.appendChild(d);
     }
   }
 
-  function setCell(i, itemIdx){
-    if (!labels) return;
-    const old = labels[i];
-    if (old === itemIdx) return;
-    labels[i] = itemIdx;
-    if (old >= 0 && items[old]) items[old].count--;
-    if (items[itemIdx]) items[itemIdx].count++;
-    boardEl.children[i].innerHTML = `<img src="${items[itemIdx].thumb}" alt="">`;
-    renderPalette();
-    result = null; active = -1;
-    stepsEl.innerHTML = '<li class="empty">棋盘改过了，重新求解。</li>';
-    $('#pos').textContent = '—';
-    setStatus(`已把 ${pos(i)} 改成 <b>${items[itemIdx].name}</b>，点「求解」重新算。`);
+  function onCellClick(i){
+    if (!editing) return;
+    selCell = i;
+    [...boardEl.children].forEach((el, k) => el.classList.toggle('sel', k === i));
+    if (selItem >= 0) setCell(i, selItem);
   }
 
-  function renderPalette(){
-    $('#itemCount').textContent = items.length ? `${items.length} 种` : '';
-    if (!items.length){ paletteEl.innerHTML = '<p class="empty">识别后这里会列出每种物品。</p>'; return; }
-    paletteEl.innerHTML = '';
-    items.forEach((it, i) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'item';
-      b.setAttribute('aria-pressed', String(selItem === i));
-      b.innerHTML = `<img src="${it.thumb}" alt=""><span class="c">${it.count}</span><span class="name">${it.name}</span>`;
-      b.onclick = () => {
-        if (selCell >= 0){ selItem = i; setCell(selCell, i); }
-        else { selItem = (selItem === i ? -1 : i); renderPalette(); }
-      };
-      b.ondblclick = () => {
-        const name = prompt('给这个物品起个名字', it.name);
-        if (name){ it.name = name.trim().slice(0, 8) || it.name; renderPalette(); }
-      };
-      paletteEl.appendChild(b);
+  // cells: 物品 id 数组，-1 为空
+  function renderState(cells){
+    for (let i = 0; i < rows * cols; i++){
+      const el = boardEl.children[i];
+      if (!el) continue;
+      const v = cells ? cells[i] : -1;
+      if (v >= 0 && items[v]){
+        el.classList.remove('empty');
+        if (el.dataset.v !== String(v)){
+          el.innerHTML = `<img src="${items[v].thumb}" alt="">`;
+          el.dataset.v = v;
+        }
+      } else {
+        el.classList.add('empty');
+        if (el.dataset.v !== ''){ el.innerHTML = ''; el.dataset.v = ''; }
+      }
+    }
+  }
+
+  function renderBoard(){
+    buildCells();
+    renderState(baseCells || labels);
+  }
+
+  /* ============ 步骤模拟 ============ */
+  function applyStep(cells, st){
+    if (st.kind === 'elim'){
+      cells[st.a] = -1;
+      cells[st.b] = -1;
+      return;
+    }
+    const d = st.dir === 'U' ? -cols : st.dir === 'D' ? cols : st.dir === 'L' ? -1 : 1;
+    const src = cells.slice();
+    for (const p of (st.pushed || [])) cells[p.to] = src[p.from];
+    cells[st.to] = src[st.from];
+    for (let k = 0; k < st.dist; k++) cells[st.from + k * d] = -1;
+    cells[st.to] = -1;
+    cells[st.partner] = -1;
+  }
+
+  function stateAt(k){
+    const cells = baseCells.slice();
+    for (let s = 0; s < k; s++) applyStep(cells, steps[s]);
+    return cells;
+  }
+
+  const pos = (i) => `第${Math.floor(i / cols) + 1}行第${i % cols + 1}列`;
+  function dirText(d){ return { U:'上', D:'下', L:'左', R:'右' }[d] || d; }
+  function dirArrow(d){ return { U:'↑', D:'↓', L:'←', R:'→' }[d] || ''; }
+
+  /* ============ 覆盖层 ============ */
+  const NS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs){
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function cellBox(i){
+    const el = boardEl.children[i];
+    if (!el) return null;
+    return { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
+  }
+
+  function drawOverlay(step){
+    const W = boardEl.clientWidth, H = boardEl.clientHeight;
+    if (!W || !H) return;
+    overlayEl.style.left = boardEl.offsetLeft + 'px';
+    overlayEl.style.top = boardEl.offsetTop + 'px';
+    overlayEl.setAttribute('width', W);
+    overlayEl.setAttribute('height', H);
+    overlayEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    overlayEl.innerHTML = '';
+    if (!step) return;
+
+    const mark = (i, color) => {
+      const r = cellBox(i);
+      if (!r) return;
+      overlayEl.appendChild(svgEl('rect', {
+        x: r.x + 1.5, y: r.y + 1.5, width: r.w - 3, height: r.h - 3, rx: 7,
+        fill: 'none', stroke: color, 'stroke-width': 3,
+        'stroke-dasharray': '7 5', 'stroke-linecap': 'round'
+      }));
+    };
+    const center = (i) => { const r = cellBox(i); return { x: r.x + r.w/2, y: r.y + r.h/2 }; };
+
+    if (step.kind === 'elim'){
+      mark(step.a, '#dc2626');
+      mark(step.b, '#dc2626');
+      const a = center(step.a), b = center(step.b);
+      overlayEl.appendChild(svgEl('line', {
+        x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+        stroke: '#dc2626', 'stroke-width': 2, 'stroke-dasharray': '6 5'
+      }));
+      return;
+    }
+
+    mark(step.from, '#d97706');
+    mark(step.to, '#2563eb');
+    if (step.partner != null) mark(step.partner, '#2563eb');
+
+    const a = center(step.from), b = center(step.to);
+    overlayEl.appendChild(svgEl('line', {
+      x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+      stroke: '#dc2626', 'stroke-width': 2, 'stroke-dasharray': '6 5'
+    }));
+
+    // 方向大箭头
+    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len > 10){
+      const ux = Math.cos(ang), uy = Math.sin(ang);
+      const sx = a.x + ux * 14, sy = a.y + uy * 14;
+      const ex = b.x - ux * 16, ey = b.y - uy * 16;
+      overlayEl.appendChild(svgEl('line', {
+        x1: sx, y1: sy, x2: ex, y2: ey,
+        stroke: '#2563eb', 'stroke-width': 5, 'stroke-linecap': 'round', opacity: .9
+      }));
+      const ah = 11;
+      const p1 = { x: ex - ux * ah - uy * ah * .6, y: ey - uy * ah + ux * ah * .6 };
+      const p2 = { x: ex - ux * ah + uy * ah * .6, y: ey - uy * ah - ux * ah * .6 };
+      overlayEl.appendChild(svgEl('polygon', {
+        points: `${ex},${ey} ${p1.x},${p1.y} ${p2.x},${p2.y}`,
+        fill: '#2563eb', opacity: .9
+      }));
+    }
+  }
+
+  /* ============ 步骤 UI ============ */
+  function setStep(k){
+    if (!steps.length) return;
+    stepIdx = Math.max(0, Math.min(k, steps.length - 1));
+    const st = steps[stepIdx];
+
+    renderState(stateAt(stepIdx));
+    drawOverlay(st);
+
+    const total = steps.length;
+    $('#curStep').textContent = stepIdx + 1;
+    $('#totStep').textContent = total;
+    $('#bar').style.width = ((stepIdx + 1) / total * 100).toFixed(1) + '%';
+    $('#range').max = total - 1;
+    $('#range').value = stepIdx;
+
+    // 指令
+    const thumb = $('#instrThumb');
+    const pill = $('#instrPill');
+    if (st.kind === 'elim'){
+      const t = thumbOf(st.a);
+      thumb.className = 'thumb';
+      thumb.innerHTML = t ? `<img src="${t}" alt="">` : '';
+      pill.className = 'pill';
+      pill.innerHTML = '<span class="arw">✕</span>点击消除这两块';
+    } else {
+      const t = thumbOf(st.from);
+      thumb.className = 'thumb';
+      thumb.innerHTML = t ? `<img src="${t}" alt="">` : '';
+      pill.className = 'pill';
+      pill.innerHTML = `<span class="arw">${dirArrow(st.dir)}</span>${dirText(st.dir)}滑 ${st.dist} 格`;
+    }
+
+    $('#tip').innerHTML = `第 <b>${stepIdx + 1}</b> 步：` +
+      (st.kind === 'elim'
+        ? `点掉 <b>${pos(st.a)}</b> 和 <b>${pos(st.b)}</b> 这两块。`
+        : `把 <b>${pos(st.from)}</b> 那块向${dirText(st.dir)}滑 <b>${st.dist}</b> 格，和 <b>${pos(st.to)}</b> 合上。`) +
+      ' 跟游戏里对不上就点「改识别结果」。';
+
+    $('#prev').disabled = stepIdx <= 0;
+    $('#next').disabled = stepIdx >= total - 1;
+    $('#range').disabled = false;
+
+    [...stepsEl.children].forEach((li, i) => li.classList.toggle('on', i === stepIdx));
+    const on = stepsEl.children[stepIdx];
+    if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+  }
+
+  function thumbOf(i){
+    const v = labels ? labels[i] : -1;
+    return v >= 0 && items[v] ? items[v].thumb : null;
+  }
+
+  function stepText(s){
+    if (s.kind === 'elim') return `消除 ${pos(s.a)} ↔ ${pos(s.b)}`;
+    return `${pos(s.from)} 向${dirText(s.dir)}滑 ${s.dist} 格 → ${pos(s.to)}`;
+  }
+
+  function renderSteps(){
+    stepsEl.innerHTML = '';
+    if (!steps.length){ stepsEl.innerHTML = '<li class="empty">没有可执行的步骤。</li>'; return; }
+    steps.forEach((s, idx) => {
+      const li = document.createElement('li');
+      const a = s.kind === 'elim' ? s.a : s.from;
+      const b = s.kind === 'elim' ? s.b : s.to;
+      const ta = thumbOf(a), tb = thumbOf(b);
+      li.innerHTML = `<span class="k">${idx + 1}</span>` +
+        `<span class="thumbs">${ta ? `<img src="${ta}" alt="">` : ''}${tb ? `<img src="${tb}" alt="">` : ''}</span>` +
+        `<span class="t">${stepText(s)}</span>`;
+      li.onclick = () => setStep(idx);
+      stepsEl.appendChild(li);
     });
   }
 
@@ -697,7 +930,6 @@
   }
 
   function solve(){
-    stopPlay();
     if (!labels){ setStatus('先上传截图。', true); return; }
     const cells = Array.from(labels, (v) => (v >= 0 ? v + 1 : 0));
     if (!cells.some(Boolean)){ setStatus('棋盘是空的。', true); return; }
@@ -714,7 +946,7 @@
         setStatus('正在搜索… ' + p);
       } else if (m.type === 'result'){
         w.terminate(); btn.disabled = false; btn.textContent = '求解';
-        showResult(m.result);
+        onSolved(m.result);
       } else if (m.type === 'error'){
         w.terminate(); btn.disabled = false; btn.textContent = '求解';
         setStatus('求解器报错：' + m.message, true);
@@ -732,77 +964,80 @@
     });
   }
 
-  const pos = (i) => `第${Math.floor(i / cols) + 1}行第${i % cols + 1}列`;
-  function stepText(s){
-    if (s.kind === 'elim') return `消除 ${pos(s.a)} ↔ ${pos(s.b)}`;
-    const dir = { U: '上', D: '下', L: '左', R: '右' }[s.dir] || s.dir;
-    return `${pos(s.from)} 向${dir}滑 ${s.dist} 格 → ${pos(s.to)}`;
-  }
-  function thumbOf(i){
-    const lab = labels ? labels[i] : -1;
-    return lab >= 0 && items[lab] ? items[lab].thumb : null;
-  }
+  function onSolved(res){
+    const list = res.solved ? res.steps : (res.bestSteps || []);
+    steps = list;
+    stepIdx = -1;
+    window.__z = { steps, labels, items, cols, rows, stateAt, applyStep };
+    baseCells = Array.from(labels);   // 物品 id
+    editing = false;
+    $('#editCard').hidden = true;
 
-  function showResult(res){
-    result = res;
-    const steps = res.solved ? res.steps : (res.bestSteps || []);
-    active = -1;
-    $('#pos').textContent = steps.length ? `0 / ${steps.length}` : '—';
-
-    if (res.solved) setStatus(`解出来了：<b>${steps.length}</b> 步，搜索 ${res.nodes || 0} 个节点，用时 ${res.elapsedMs ?? 0} ms。`);
-    else if (res.exhausted) setStatus(`按当前识别这盘是死局（穷举完也清不空，剩 ${res.bestRemaining ?? '?'} 块）。` +
-      ' 如果官网能解，多半是棋盘读错了——先核对高亮格，或用「网格校准」微调后重新识别。', true);
-    else setStatus(`时间不够，只搜到部分结果（剩 ${res.bestRemaining ?? '?'} 块）。`, true);
-
-    stepsEl.innerHTML = '';
-    if (!steps.length){ stepsEl.innerHTML = '<li class="empty">没有可执行的步骤。</li>'; return; }
-    steps.forEach((s, idx) => {
-      const li = document.createElement('li');
-      const a = s.kind === 'elim' ? s.a : s.from;
-      const b = s.kind === 'elim' ? s.b : s.to;
-      const ta = thumbOf(a), tb = thumbOf(b);
-      li.innerHTML = `<span class="k">${idx + 1}</span>` +
-        `<span class="thumbs">${ta ? `<img src="${ta}" alt="">` : ''}${tb ? `<img src="${tb}" alt="">` : ''}</span>` +
-        `<span class="t"><span class="kind ${s.kind}">${s.kind === 'elim' ? '点击' : '滑动'}</span>${stepText(s)}</span>`;
-      li.onclick = () => { stopPlay(); setActive(idx); };
-      stepsEl.appendChild(li);
-    });
-    setActive(0);
-  }
-
-  function clearHL(){ for (const el of boardEl.children) el.classList.remove('hl', 'hl2'); }
-
-  function setActive(idx){
-    const steps = result ? (result.solved ? result.steps : (result.bestSteps || [])) : [];
-    if (!steps.length) return;
-    active = Math.max(0, Math.min(idx, steps.length - 1));
-    clearHL();
-    const s = steps[active];
-    const mark = (i, cls) => { const el = boardEl.children[i]; if (el) el.classList.add(cls); };
-    if (s.kind === 'elim'){ mark(s.a, 'hl'); mark(s.b, 'hl'); }
-    else {
-      mark(s.from, 'hl'); mark(s.to, 'hl2');
-      if (s.partner != null) mark(s.partner, 'hl2');
-      (s.pushed || []).forEach(p => mark(p.from, 'hl2'));
+    if (res.solved){
+      setStatus(`解出来了：<b>${list.length}</b> 步，搜索 ${res.nodes || 0} 个节点，用时 ${res.elapsedMs ?? 0} ms。`);
+    } else if (res.exhausted){
+      setStatus(`按当前识别这盘是死局（穷举完也清不空，剩 ${res.bestRemaining ?? '?'} 块）。` +
+        ' 如果官网能解，多半是棋盘读错了——点「改识别结果」核对，或用下面的网格校准重识别。', true);
+    } else {
+      setStatus(`时间不够，只搜到部分结果（剩 ${res.bestRemaining ?? '?'} 块）。`, true);
     }
-    [...stepsEl.children].forEach((li, i) => li.classList.toggle('on', i === active));
-    const on = stepsEl.children[active];
-    if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
-    $('#pos').textContent = `${active + 1} / ${steps.length}`;
+
+    renderSteps();
+    if (list.length){
+      setStep(0);
+      $('#prev').disabled = true;
+      $('#next').disabled = list.length <= 1;
+    } else {
+      $('#curStep').textContent = '0';
+      $('#totStep').textContent = '0';
+      $('#bar').style.width = '0%';
+      $('#instrPill').className = 'pill gray';
+      $('#instrPill').textContent = '没有可执行的步骤';
+      $('#instrThumb').className = 'thumb empty';
+      $('#instrThumb').innerHTML = '';
+    }
   }
 
-  function stopPlay(){
-    if (timer){ clearInterval(timer); timer = null; $('#play').textContent = '播放'; }
+  /* ============ 物品面板 ============ */
+  function setCell(i, itemIdx){
+    if (!labels) return;
+    const old = labels[i];
+    if (old === itemIdx) return;
+    labels[i] = itemIdx;
+    if (old >= 0 && items[old]) items[old].count--;
+    if (items[itemIdx]) items[itemIdx].count++;
+    if (baseCells) baseCells[i] = itemIdx;
+    renderState(baseCells || labels);
+    renderPalette();
+    steps = []; stepIdx = -1;
+    stepsEl.innerHTML = '<li class="empty">棋盘改过了，点「求解」重新算。</li>';
+    $('#prev').disabled = true; $('#next').disabled = true; $('#range').disabled = true;
+    $('#instrPill').className = 'pill gray';
+    $('#instrPill').textContent = '棋盘已修改，重新求解';
+    setStatus(`已把 ${pos(i)} 改成 <b>${items[itemIdx].name}</b>，点「求解」重新算。`);
   }
-  function togglePlay(){
-    if (timer){ stopPlay(); return; }
-    const steps = result ? (result.solved ? result.steps : (result.bestSteps || [])) : [];
-    if (!steps.length) return;
-    $('#play').textContent = '暂停';
-    timer = setInterval(() => {
-      if (active >= steps.length - 1){ stopPlay(); return; }
-      setActive(active + 1);
-    }, 900);
+
+  function renderPalette(){
+    $('#itemCount').textContent = items.length ? `${items.length} 种` : '';
+    if (!items.length){ paletteEl.innerHTML = '<p class="empty">识别后这里会列出每种物品。</p>'; return; }
+    paletteEl.innerHTML = '';
+    items.forEach((it, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'item';
+      b.setAttribute('aria-pressed', String(selItem === i));
+      b.innerHTML = `<img src="${it.thumb}" alt=""><span class="c">${it.count}</span>`;
+      b.title = it.name;
+      b.onclick = () => {
+        if (selCell >= 0){ selItem = i; setCell(selCell, i); }
+        else { selItem = (selItem === i ? -1 : i); renderPalette(); }
+      };
+      b.ondblclick = () => {
+        const name = prompt('给这个物品起个名字', it.name);
+        if (name){ it.name = name.trim().slice(0, 8) || it.name; renderPalette(); }
+      };
+      paletteEl.appendChild(b);
+    });
   }
 
   /* ============ 事件 ============ */
@@ -810,9 +1045,33 @@
   $('#cols').onchange = (e) => { cols = Math.max(2, Math.min(20, +e.target.value || 10)); e.target.value = cols; if (img){ grid = null; autoDetect(); recognize(); } };
   $('#btnAgain').onclick = recognize;
   $('#btnSolve').onclick = solve;
-  $('#prev').onclick = () => { stopPlay(); setActive(active - 1); };
-  $('#next').onclick = () => { stopPlay(); setActive(active + 1); };
-  $('#play').onclick = togglePlay;
+  $('#prev').onclick = () => setStep(stepIdx - 1);
+  $('#next').onclick = () => setStep(stepIdx + 1);
+  $('#range').oninput = (e) => setStep(+e.target.value);
+
+  $('#btnEdit').onclick = () => {
+    editing = !editing;
+    $('#editCard').hidden = !editing;
+    selCell = -1;
+    [...boardEl.children].forEach(el => el.classList.remove('sel'));
+    $('#btnEdit').textContent = editing ? '完成修改' : '改识别结果';
+    if (editing) setStatus('点某个格子选中，再点物品即可改判。');
+    else if (steps.length) setStatus('改判已结束，点「求解」可重新计算。');
+  };
+
+  document.addEventListener('keydown', (e) => {
+    if (!steps.length) return;
+    if (e.key === 'ArrowLeft'){ e.preventDefault(); setStep(stepIdx - 1); }
+    else if (e.key === 'ArrowRight' || e.key === ' '){ e.preventDefault(); setStep(stepIdx + 1); }
+    else if (e.key === 'Escape'){
+      e.preventDefault();
+      if (!editing) $('#btnEdit').click();
+    }
+  });
+
+  new ResizeObserver(() => {
+    if (steps.length && stepIdx >= 0) drawOverlay(steps[stepIdx]);
+  }).observe(boardEl);
 })();
 </script>
 </body>
